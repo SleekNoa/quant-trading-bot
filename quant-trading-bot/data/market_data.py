@@ -110,4 +110,11 @@ def _simulate() -> pd.DataFrame:
     df = pd.DataFrame(rows).T.astype(float)
     df.index = pd.to_datetime(df.index)
     df = df.sort_index()
+    df = df.rename(columns={
+        "1. open":   "open",
+        "2. high":   "high",
+        "3. low":    "low",
+        "4. close":  "close",
+        "5. volume": "volume",
+    })
     return df

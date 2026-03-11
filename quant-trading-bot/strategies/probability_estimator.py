@@ -68,41 +68,42 @@ def estimate_crossover_probability(df):
     prob_cross = _norm_cdf(z)   # P(gap ≤ 0 at time T | current gap_now)
 
     # ── Regime-aware assignment ───────────────────────────────────────────────
+    display_prob = round(min(prob_cross * 100, 70.0), 1)  # single capped value used everywhere
+
     if gap_now > 0:
         # Already bullish (positive gap) → crossing zero means bearish crossover
-        buy_3d_pct = 0.0
-        sell_3d_pct = round(min(prob_cross * 100, 70.0), 1)
-        direction = "downward (bearish crossover likely)"
-        regime = "bullish"
+        buy_3d_pct  = 0.0
+        sell_3d_pct = display_prob
+        regime      = "Bullish"
+        forecast    = f"Bearish crossover in 3 days: {display_prob}%"
     elif gap_now < 0:
         # Already bearish → crossing zero means bullish crossover
-        buy_3d_pct = round(min(prob_cross * 100, 70.0), 1)
+        buy_3d_pct  = display_prob
         sell_3d_pct = 0.0
-        direction = "upward (bullish crossover likely)"
-        regime = "bearish"
+        regime      = "Bearish"
+        forecast    = f"Bullish crossover in 3 days: {display_prob}%"
     else:
         # Exactly at zero — symmetric
-        p = round(min(prob_cross * 100, 70.0), 1)
-        buy_3d_pct = sell_3d_pct = p
-        direction = "neutral"
-        regime = "neutral"
+        buy_3d_pct  = display_prob
+        sell_3d_pct = display_prob
+        regime      = "Neutral"
+        forecast    = f"Crossover either direction in 3 days: {display_prob}%"
+
+    # ── Strength qualifier (based on capped display_prob for consistency) ─────
+    strength = ""
+    if display_prob >= 65:
+        strength = " (strong reversal pressure)"
+    elif display_prob >= 50:
+        strength = " (moderate reversal pressure)"
+    elif display_prob >= 35:
+        strength = " (mild reversal pressure)"
 
     # ── Human-readable explanation ────────────────────────────────────────────
     expl = (
         f"{strategy_name} gap = {gap_now:.3f}  |  "
         f"z = {z:.2f}  |  μ = {drift:.4f}  |  σ = {vol:.4f}  |  "
-        f"Current regime: {regime}  →  "
-        f"est {prob_cross*100:.1f}% chance of crossover in 3 days ({direction})"
+        f"Current regime: {regime}  →  {forecast}{strength}"
     )
-
-    if abs(z) > 2.0:
-        strength = "strong"
-    elif abs(z) > 1.0:
-        strength = "moderate"
-    else:
-        strength = "weak"
-
-    expl += f" ({strength} {regime} bias)"
 
     return {
         "buy_3d_pct": buy_3d_pct,

@@ -19,9 +19,16 @@ from backtesting.backtester import backtest
 from execution.broker import buy, sell, get_account
 from risk.risk_manager import calculate_position_size
 from config.settings import (
-    SYMBOL, SHORT_WINDOW, LONG_WINDOW,
-    INITIAL_CAPITAL, RISK_PERCENT,
+    SYMBOL,
+    SHORT_WINDOW, LONG_WINDOW,
+    MACD_FAST, MACD_SLOW, MACD_SIGNAL,
+    RSI_PERIOD, RSI_OVERSOLD, RSI_OVERBOUGHT,
+    BB_PERIOD, BB_STD,
+    STOCH_K, STOCH_D,
+    INITIAL_CAPITAL,
+    RISK_PERCENT,
     ALPACA_API_KEY,
+    STRATEGY,
 )
 from utils.logger import setup_logger
 
@@ -108,8 +115,8 @@ def run():
     # ── NEW: 3-day crossover probability ──────────────────────
     from strategies.probability_estimator import estimate_crossover_probability
     probs = estimate_crossover_probability(df)
-    logger.info(f"           P(BUY next 3d)  : {probs['buy_3d_pct']}%")
-    logger.info(f"           P(SELL next 3d) : {probs['sell_3d_pct']}%")
+    #logger.info(f"           P(BUY next 3d)  : {probs['buy_3d_pct']}%")
+    #logger.info(f"           P(SELL next 3d) : {probs['sell_3d_pct']}%")
     logger.info(f"           Basis           : {probs['explanation']}")
 
     # Only place a paper order if Alpaca keys are configured
