@@ -1,0 +1,243 @@
+NExt DAY: develop all of the priorities 1, 2, 3, and 5 in detail through code changes(Logistic regression preferred for directional probability,Logistic-based pipeline usually scales better , ensuring and integrating MAIN and seetings current form is kept in form ("""
+QuantBot — Self-Evolving Multi-Strategy Paper Trading Bot
+==========================================================
+Run:
+    python main.py
+
+Pipeline (7 phases):
+    1. Market data          (yfinance / simulated fallback)          ← UPDATED
+    2. Indicator prep       (MACD, RSI, BB, Stoch, ADX, OBV columns)
+    3. Regime detection     (trending vs ranging — drives engine weights)
+    4. Strategy engine      (6 plugins vote: MACD, RSI, BB, Stoch, SMA, DC)
+    5. Engine backtest      (per-strategy accuracy + ensemble metrics)
+    6. Risk evaluation      (VaR sizing, circuit-breakers, MC stress test)
+    7. Paper trade          (Alpaca — only fires on high-conviction signals)
+
+Strategy framework:
+    Long, Kampouridis & Papastylianou (2026). Multi-objective GP-based
+    algorithmic trading using directional changes. AI Review 59:39.
+    -> DC events, regime-aware weights, ensemble voting.
+
+Risk framework:
+    Wang, Zhao & Wang (2026). Integrated financial risk management
+    framework. Case Studies in Thermal Engineering. ScienceDirect.
+    -> VaR/CVaR sizing, circuit-breakers, Monte Carlo stress testing.
+"""
+
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
+
+# ── Auto-register all strategy plugins ───────────────────────────────
+import strategies.plugins  # noqa — triggers @register_strategy decorators
+
+from data.market_data import get_historical_data
+from strategies.strategy_engine import (
+    evaluate_strategies, detect_market_regime,
+    log_engine_report, list_strategies,
+)
+from strategies.adx_filter  import add_adx
+from strategies.obv_filter  import add_obv
+from strategies.macd_strategy      import generate_signals as macd_gen
+from strategies.rsi_strategy       import generate_signals as rsi_gen
+from strategies.bollinger_strategy import generate_signals as bollinger_gen
+from strategies.stochastic_strategy import generate_signals as stochastic_gen
+from strategies.probability_estimator import estimate_crossover_probability
+from backtesting.backtester import backtest_engine, log_per_strategy_report
+from execution.broker import buy, sell, get_account, get_position
+from risk.risk_manager import (
+    calculate_position_size, compute_historical_var, compute_cvar,
+    check_drawdown_circuit_breaker, passes_signal_gate,
+    monte_carlo_stress_test, get_stop_loss_price,
+)
+from utils.logger import logger
+from config.settings import (
+    SYMBOL, INITIAL_CAPITAL, ALPACA_API_KEY,
+    MACD_FAST, MACD_SLOW, MACD_SIGNAL,
+    ADX_PERIOD, ADX_THRESHOLD, OBV_MA_PERIOD,
+    USE_ADX_FILTER, USE_OBV_FILTER,
+    VAR_CONFIDENCE, MAX_RISK_PER_TRADE_PCT,
+    MAX_PORTFOLIO_DRAWDOWN_PCT, DAILY_LOSS_LIMIT_PCT,
+    MIN_SIGNAL_PROBABILITY, USE_STOP_LOSS, STOP_LOSS_PCT,
+    RUN_STRESS_TEST,
+)
+
+SEP  = "=" * 70
+SEP2 = "-" * 70
+
+
+def _pct(v): return f"+{v:.2f}%" if v >= 0 else f"{v:.2f}%"
+def _usd(v): return f"${v:>12,.2f}"
+
+
+def prepare_indicators(df):
+    """
+    Add all indicator columns needed by the plugin strategies.
+    Each plugin can compute inline, but pre-computing here is faster
+    and avoids redundant rolling calculations on every engine call.
+    """
+    df = macd_gen(df)        # adds macd, macd_signal, signal, crossover
+    df = rsi_gen(df)         # adds rsi
+    df = bollinger_gen(df)   # adds bb_upper, bb_lower, bb_mid
+    df = stochastic_gen(df)  # adds %K, %D
+    df = add_adx(df)         # adds adx, adx_trending
+    df = add_obv(df)         # adds obv, obv_ma, obv_rising
+    return df
+
+
+def print_backtest_header(result):
+    sharpe_note = ("  [good]"     if result["sharpe"] > 1.0
+              else "  [marginal]" if result["sharpe"] > 0.5
+              else "  [poor]")
+    dd_note     = ("  [comfortable]" if result["max_drawdown"] > -10
+              else "  [moderate]"    if result["max_drawdown"] > -20
+              else "  [high]")
+
+    logger.info(SEP)
+    logger.info(f"  ENGINE BACKTEST  --  {SYMBOL}")
+    logger.info(SEP)
+    logger.info(f"  {'Initial Capital':<26} {_usd(INITIAL_CAPITAL)}")
+    logger.info(f"  {'Final Value':<26} {_usd(result['final_value'])}  <- {_pct(result['return_pct'])}")
+    logger.info(SEP2)
+    logger.info(f"  {'Buy & Hold':<26} {'':>13}  {_pct(result['buy_hold'])}")
+    logger.info(f"  {'Alpha (vs B&H)':<26} {'':>13}  {_pct(result['return_pct'] - result['buy_hold'])}")
+    logger.info(SEP2)
+    logger.info(f"  {'Sharpe Ratio':<26} {result['sharpe']:>13.2f}{sharpe_note}")
+    logger.info(f"  {'Max Drawdown':<26} {result['max_drawdown']:>12.2f}%{dd_note}")
+    logger.info(f"  {'Avg Trade Return':<26} {result['avg_trade_pct']:>12.2f}%")
+    logger.info(SEP2)
+    logger.info(f"  {'Win Rate':<26} {result['win_rate']:>12.1f}%")
+    logger.info(f"  {'Total Trades':<26} {result['n_trades']:>13}")
+    logger.info(SEP)
+
+
+def print_risk_dashboard(cash, equity, var, cvar):
+    logger.info(SEP2)
+    logger.info("  RISK DASHBOARD")
+    logger.info(SEP2)
+    logger.info(f"  {'Portfolio Equity':<26} {_usd(equity)}")
+    logger.info(f"  {'Available Cash':<26} {_usd(cash)}")
+    logger.info(f"  {'1-day VaR (95%)':<26} {var*100:>12.2f}%  (${equity*var:,.0f} at risk)")
+    logger.info(f"  {'CVaR (tail)':<26} {cvar*100:>12.2f}%  (${equity*cvar:,.0f} expected)")
+    logger.info(f"  {'Max risk/trade':<26} {MAX_RISK_PER_TRADE_PCT*100:>12.1f}%")
+    logger.info(f"  {'Drawdown circuit-break':<26} {MAX_PORTFOLIO_DRAWDOWN_PCT*100:>11.0f}%")
+    logger.info(f"  {'Stop-loss':<26} {'ON -'+str(int(STOP_LOSS_PCT*100))+'%':>13}" if USE_STOP_LOSS else
+                f"  {'Stop-loss':<26} {'OFF':>13}")
+    logger.info(f"  {'MC stress test':<26} {'ON' if RUN_STRESS_TEST else 'OFF':>13}")
+    logger.info(f"  {'Min signal prob':<26} {MIN_SIGNAL_PROBABILITY:>12.0f}%")
+    logger.info(SEP2)
+
+
+def run():
+    logger.info(SEP)
+    logger.info(f"  QuantBot  |  {SYMBOL}  |  6-plugin engine")
+    logger.info(f"  Registered strategies: {', '.join(list_strategies())}")
+    logger.info(SEP)
+
+    # ── 1. Market Data ────────────────────────────────────────────────
+    logger.info("[ 1 / 7 ]  Downloading market data...")
+    df = get_historical_data()
+    # The yfinance print ("✅ yfinance: 1,2xx fresh bars...") already appears from market_data.py
+    logger.info(f"           {len(df)} bars loaded ({df.index[0].date()} -> {df.index[-1].date()})")
+
+    # ── 2. Compute all indicator columns ─────────────────────────────
+    logger.info("[ 2 / 7 ]  Computing indicators...")
+    df = prepare_indicators(df)
+    logger.info("           MACD / RSI / Bollinger / Stochastic / ADX / OBV ready")
+
+    # ── 3. Regime detection ───────────────────────────────────────────
+    logger.info("[ 3 / 7 ]  Detecting market regime...")
+    regime = detect_market_regime(df, ADX_THRESHOLD)
+
+    # ── 4. Engine signal (live — uses last bar) ───────────────────────
+    logger.info("[ 4 / 7 ]  Running strategy engine (live signal)...")
+    decision, report = evaluate_strategies(df, regime=regime)
+    log_engine_report(report)
+
+    latest      = df.iloc[-1]
+    price       = float(latest["close"])
+    latest_date = df.index[-1].strftime("%Y-%m-%d")
+    logger.info(f"           Date  : {latest_date}   Price : ${price:.2f}")
+
+    # Probability estimator (uses MACD gap)
+    probs = estimate_crossover_probability(df)
+    logger.info(f"           Forecast: {probs['explanation']}")
+
+    # ── 5. Engine backtest ────────────────────────────────────────────
+    logger.info("[ 5 / 7 ]  Running engine backtest...")
+    result = backtest_engine(df)
+    print_backtest_header(result)
+    if "per_strategy" in result:
+        log_per_strategy_report(result["per_strategy"])
+
+    # ── 6+7. Risk eval + paper trade ──────────────────────────────────
+    logger.info("[ 6 / 7 ]  Risk evaluation + paper trade...")
+
+    alpaca_ready = bool(ALPACA_API_KEY and ALPACA_API_KEY not in ("", "YOUR_KEY"))
+    if not alpaca_ready:
+        logger.info("           Alpaca keys not configured -- skipping live orders")
+        logger.info(SEP + "\n")
+        return
+
+    account = get_account()
+    if account is None:
+        logger.error("           Cannot reach Alpaca -- aborting")
+        logger.info(SEP + "\n")
+        return
+
+    cash   = account["cash"]
+    equity = account["equity"]
+    var    = compute_historical_var(df)
+    cvar   = compute_cvar(df)
+    print_risk_dashboard(cash, equity, var, cvar)
+
+    # Drawdown circuit-breaker
+    peak = max(equity, float(INITIAL_CAPITAL))
+    if check_drawdown_circuit_breaker(equity, peak):
+        logger.info(SEP + "\n")
+        return
+
+    # No actionable signal
+    if decision == "HOLD":
+        position = get_position(SYMBOL)
+        if position:
+            logger.info(f"           Holding {position['qty']}x {SYMBOL}  "
+                        f"(P&L: ${position['unrealized_pl']:+,.2f})")
+        else:
+            logger.info("           Engine says HOLD -- flat, no action")
+        logger.info(SEP + "\n")
+        return
+
+    # Signal quality gate (probability filter)
+    cross_dir = 1 if decision == "BUY" else -1
+    if not passes_signal_gate(probs["buy_3d_pct"], probs["sell_3d_pct"], cross_dir):
+        logger.info("           Trade blocked by signal quality gate")
+        logger.info(SEP + "\n")
+        return
+
+    if decision == "SELL":
+        logger.info("[ 7 / 7 ]  Executing SELL...")
+        sell(SYMBOL)
+        logger.info(SEP + "\n")
+        return
+
+    # BUY path
+    logger.info("[ 7 / 7 ]  Executing BUY...")
+    qty = calculate_position_size(cash, price, df)
+    if qty <= 0:
+        logger.warning("           qty=0 -- insufficient capital or risk budget")
+        logger.info(SEP + "\n")
+        return
+
+    stress = monte_carlo_stress_test(df, price, qty)
+    if not stress["passed"]:
+        logger.info("           Trade blocked by Monte Carlo stress test")
+        logger.info(SEP + "\n")
+        return
+
+    stop_price = get_stop_loss_price(price) if USE_STOP_LOSS else None
+    buy(SYMBOL, qty, stop_loss_price=stop_price)
+    logger.info(SEP + "\n")
+
+
+if __name__ == "__main__":
+    run()). GIve the code changes int py files 

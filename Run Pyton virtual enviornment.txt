@@ -1,0 +1,14 @@
+# 1) See what Windows Pythons are installed
+py -0p
+
+# 2) Create a virtual environment with Windows Python (even if MSYS2 is first in PATH)
+py -3 -m venv .venv
+
+# 3) Activate it (this also puts the right python/pip in PATH for this session)
+.\.venv\Scripts\Activate.ps1
+
+# 4) Upgrade pip/tools inside the venv
+python -m pip install --upgrade pip setuptools wheel
+
+# 5) Install your requirements
+python -m pip install -r requirements.txt

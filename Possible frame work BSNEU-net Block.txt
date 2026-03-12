@@ -1,0 +1,3134 @@
+Possible frame work BSNEU-net: Block Feature Map Distortion and Switchable Normalization-Based Enhanced Union-net for Acute Leukemia Detection on Heterogeneous Dataset.
+Published in:Journal of Imaging Informatics in Medicine, Jun2025,CINAHL Complete
+By:Saikia, Rabul;Deka, Roopam;Sarma, Anupam;Devi, Salam Shuleenda
+
+Acute leukemia is characterized by the swift proliferation of immature white blood cells (WBC) in the blood and bone marrow. It is categorized into acute lymphoblastic leukemia (ALL) and acute myeloid leukemia (AML), depending on whether the cell-line origin is lymphoid or myeloid, respectively. Deep learning (DL) and artificial intelligence (AI) are revolutionizing medical sciences by assisting clinicians with rapid illness identification, reducing workload, and enhancing diagnostic accuracy. This paper proposes a DL-based novel BSNEU-net framework to detect acute leukemia. It comprises 4 Union Blocks (UB) and incorporates block feature map distortion (BFMD) with switchable normalization (SN) in each UB. The UB employs union convolution to extract more discriminant features. The BFMD is adapted to acquire more generalized patterns to minimize overfitting, whereas SN layers are appended to improve the model's convergence and generalization capabilities. The uniform utilization of batch normalization across convolution layers is sensitive to the mini-batch dimension changes, which is effectively remedied by incorporating an SN layer. Here, a new dataset comprising 2400 blood smear images of ALL, AML, and healthy cases is proposed, as DL methodologies necessitate a sizeable and well-annotated dataset to combat overfitting issues. Further, a heterogeneous dataset comprising 2700 smear images is created by combining four publicly accessible benchmark datasets of ALL, AML, and healthy cases. The BSNEU-net model achieved excellent performance with 99.37% accuracy on the novel dataset and 99.44% accuracy on the heterogeneous dataset. The comparative analysis signifies the superiority of the proposed methodology with comparing schemes.
+
+Keywords: BSNEU-net; Block feature map distortion (BFMD); Switchable normalization (SN); Union convolution; Heterogeneous dataset; Acute leukemia
+
+Copyright comment Springer Nature or its licensor (e.g. a society or other partner) holds exclusive rights to this article under a publishing agreement with the author(s) or other rightsholder(s); author self-archiving of the accepted manuscript version of this article is solely governed by the terms of such publishing agreement and applicable law.
+
+Introduction
+Cancer refers to a collection of potentially fatal disorders in which aberrant cells proliferate fast and uncontrolled, eventually invading and spreading to other tissues and organs of the body [[ 1 ]]. Cancer is the second leading cause of mortality worldwide, with about 200 distinct forms of cancer [[ 1 ]]. Leukemia is a kind of cancer that arises in the blood-forming tissues of the bone marrow. It leads to excessive abnormal WBC in the bone marrow and blood, displacing normal blood cells that may lead to life-threatening infections and perhaps early death [[ 3 ]]. In 2022, the Global Cancer Observatory (Globcan) reported a total of 487,294 newly diagnosed cases of leukemia globally and 305,405 fatalities [[ 5 ]]. The common symptoms of leukemia encompass fever, fatigue, weakness, recurrent infections, weight loss, hepatomegaly or splenomegaly, lymphadenopathy, petechiae, ecchymosis, epistaxis, bone pain, diaphoresis, and other related symptoms [[ 2 ]]. Leukemia has two forms based on the growth rate and stage of differentiation of malignant cells. Acute leukemia is characterized by fast cell proliferation and more blasts, whereas chronic leukemia is characterized by sluggish growth, mature cells, and fewer than 20% blasts. Thus, leukemia is classified into four categories: ALL, AML, chronic lymphoblastic leukemia (CLL), and chronic myeloid leukemia (CML) [[ 6 ], [ 8 ], [ 9 ]–[10]].
+
+Pathologists diagnose leukemia by examining blood and bone marrow smears through a microscope and use sophisticated laboratory tests for its categorization [[ 8 ], [11], [12]–[13]]. The signs and symptoms, complete blood count (CBC) test, and peripheral blood and bone marrow smear analysis are the primary clinical methods to diagnose leukemia. Further, advanced methods like coagulation studies, flow cytometry, cytogenetic analysis, fluorescence in situ hybridization (FISH), lumbar puncture, myelograms, and polymerase chain reaction (PCR) may be required to validate the subtyping of leukemia. These tests (except CBC) are conducted manually by pathologists, meaning that the accuracy of the tests depends on the pathologist's expertise and degree of exhaustion. Thus, it is essential to create computer-assisted automated systems that can identify and classify leukemia with high accuracy and precision. This will alleviate the workload of physicians and pathologists while facilitating the early diagnosis of leukemia by providing timely meditation.
+
+Related Work
+In recent years, numerous approaches have been carried out to detect leukemia, concentrating mostly on acute leukemia. Labati et al. [[14]] created a dataset comprised of microscopic images of healthy and leukemic blood samples. This dataset includes 108 public RGB color images captured with a PowerShot G5 camera mounted to a microscope at 300–500 magnification. Mohapatra et al. [[15]] employed fuzzy-based two-stage color segmentation for WBC separation from other blood components. The computed features for the work were Hausdorff dimension (HD), contour signature, shape, and color discriminative features. Their model obtained a 93% accuracy rate employing a support vector machine (SVM) on 108 images provided by Ispat General Hospital in Rourkela, Orissa. In another work, Mohapatra et al. [[16]] employed 104 images from the dataset of their previous approach [[15]]. Morphological, Haar wavelet, Haralick, 2-D discrete Fourier transform, and color features were considered. The approach attained a 94.73% accuracy using an ensemble classifier comprising SVM, radial basis function network (RBFN), multilayer perceptron (MLP), Naïve Bayes (NB), and K-nearest neighbor (K-NN). Agaian et al. [[17]] introduced the use of morphological operation in conjunction with K-means clustering to segment WBC. The HD, color, shape, and texture features were calculated and incorporated with a linear SVM for AML classification. The work attained 98% accuracy on a dataset comprising 80 images with a resolution of 184 × 138 pixels provided by ASH [[18]]. Putzu et al. [[19]] computed various features like Haralick, shape, and color features in combination with SVM for detecting ALL. Their model achieved a 93.63% accuracy on a dataset including 267 sub-images of WBC collected from 33 smear images. Neoh et al. [[20]] applied a similar methodology by considering features like shape, color, and texture. The model analyzed 180 images, yielding a 96.72% accuracy with a Dempster-Shafer ensemble classifier. Das et al. [[21]] computed the gray level run-length matrix (GLRLM) and gray level co-occurrence matrix (GLCM) based texture features in combination with color and shape features, followed by feature selection using principal component analysis (PCA). The methodology obtained a 96.00% accuracy and 92.64% sensitivity on the ALL-IDB1 [[14]] dataset. Rawat et al. [[22]] suggested a computer-assisted categorization framework for ALL, AML, and healthy cases. Further, the work concentrated on the French, American, and British (FAB) classification of ALL. A database containing 100 healthy, 60 ALL, and 80 AML images was gathered from the ASH [[18]] dataset. They could only concentrate on three subtypes of AML (M2, M3, and M5) due to data limitations. The methodology showed a 99.5% accuracy in detecting ALL, AML, and healthy cases, while ALL and AML subtypes had 97.1% and 98.5% accuracy, respectively. Negum et al. [[12]] introduced a decision support system for identifying leukemia. This system used k-means clustering in segmentation and employed features like shape, color, and texture for analysis. Their approach used a decision tree and artificial neural network (ANN) as a classifier, achieving an accuracy of 99.51%, a sensitivity of 99.348%, and a specificity of 99.529% on a dataset comprising 757 images. Saikia et al. [[13]] presented color-based K-means clustering with a marker-controlled watershed in WBC segmentation, followed by a 15-dimensional feature extraction combining texture and color features. An ANOVA test was carried out to identify significant features, and the zero phase component analysis (ZCA) was employed to remove the covariance structure and reconstruct the features in decreasing order of F -values. Finally, the whale optimization algorithm-based SVM (WOA-SVM) was suggested and attained 98.42% accuracy on the ALL-IDB1 [[14]] dataset. Moshavash et al. [[23]] suggested a WBC-segmentation approach based on the watershed algorithm. The segmented WBCs were used to compute shape, color, and local binary pattern (LBP)-based texture features. Their approach attained an accuracy of 98.10% for cell-level classification and 89.81% accuracy for image-level classification by adapting the ensemble classifier. Mishra et al. [[24]] suggested the GLRLM to extract textural features with SVM for ALL detection. The approach achieved 96.97% accuracy on the ALL-IDB1 [[14]] dataset. Hegde et al. [[25]] employed Rosin thresholding, morphological operation, and area filtering strategy to identify the WBC's nuclei, followed by the active contour strategy for WBC detection. The features like morphological, color, and texture were considered. The classification of healthy and leukemic cells was performed by combining an SVM with NN, yielding a 98.80% accuracy on a dataset gathered from Kasturba Medical College, Manipal, India. Agaian et al. [[26]] distinguished ALL and healthy WBC using 98 images from the ALL-IDB [[14]] dataset. The model considered Haralick, Haar wavelet, HD, shape, and color features, followed by SVM classification with a 98.55% precision rate. Agustin et al. [[27]] offered GLCM and Canny edge detection for texture and morphological features and the modified binary particle swarm optimization (MBPSO) for feature selection. Multiclass neural network-back propagation (NN-BP) and NN-PSO were used to categorize five peripheral smears collected from the Sardjito Hospital ALL dataset and obtained an 86.92% accuracy. In their ML-based approach, Abhishek et al. [[ 8 ]] suggested histogram of oriented gradients (HOG), rotation invariant LBP with a uniform pattern as texture feature extractors, and SVM for classification. Their approach achieved 50% accuracy using HOG with SVM and 83% accuracy using ILBP with SVM on a privately collected dataset comprising 500 smear images.
+
+Hematological disease identification like leukemia using ML-based techniques needs accurate blood cell segmentation [[28]]. However, the key challenges are inhomogeneity in blood cells, noise, weak edges, seed-point selection, and over-segmentation. Laplacian-of-Gaussian (LoG) was applied by Das et al. [[28]] to enhance image quality by strengthening edges, minimizing blurring, and eliminating noise. Bounded opening and fast radial symmetry (BO-FRS) were used to choose the first seed point. Over-segmentation was addressed by geometric ellipse fitting (EF) in conjunction with algebraic EF. The geometric EF estimates major and minor axes using residue and residue-offset values. In another approach [[29]], the adaptive weight-optimized level set evolution (AWOLSE) was used to minimize the energy function and optimize edge and area parameter weights for contour recognition. A marker-controlled watershed algorithm with AWOLSE was used to segment blood cells precisely, whereas color-based K-means clustering was applied prior to AWOLSE in unwanted cell removal.
+
+Recent studies signify that DL techniques have the capability to perform automated feature extraction [[ 8 ], [30]]. Kumar et al. [[32]] introduced an optimized convolutional neural networks (CNN) architecture for the identification of two specific forms of cancer, namely B-ALL and multiple myeloma (MM). The model used the SN-AM dataset, which consisted of 90 B-ALL and 100 MM images, achieving an accuracy rate of 97.20%. Vogado et al. [[ 4 ]] presented an approach combining three CNN architectures (AlexNet, CaffeNet, and Vgg-f) for feature extraction. The feature selection is done using the gain ratio technique and then classified using an SVM. The approach used three separate databases from the literature and attained hit rates of over 99%. Karar et al. [[33]] provide a sophisticated internet of medical things (IoMT) system for classifying and detecting leukemia. An auxiliary classifier generative adversarial network (ACGAN) classifier was created and achieved an accuracy of 98.67% for distinguishing between ALL and healthy categories and 95.5% for distinguishing between ALL, AML, or normal classes. Abhishek et al. [[ 8 ]] presented a collection of 500 microscopic blood images. The dataset comprises three distinct categories of images: normal, AML, and ALL. The image dataset was expanded by integrating ALL-IDB [[18]] images. Binary and three-class classifications were executed using the transfer learning methodology, achieving 98% and 95% accuracy rates for binary and three-class classifications, respectively. In another approach, Abhishek et al. [[ 9 ]] created a dataset consisting of 750 blood smear images representing ALL, AML, CLL, and CML cases. The dataset was enlarged by adding 500 smear images from their earlier study [[ 8 ]]. This dataset was utilized for the automated identification of leukemia using deep transfer learning. The SVM achieved an accuracy of 84% on a subject-independent test dataset by training on features derived from a pruned VGG16 model, with the final three convolutional layers being fine-tuned. The gradient-weighted class activation mapping (Grad-CAM) approach was used to display the relevant features for classifying different types of leukemia and healthy WBC.
+
+Das et al. [[34]] introduced a classification technique for ALL using the ShuffleNet model. Their methodology exhibited an accuracy of 96.97% and a sensitivity of 98.00% when applied to the ALL-IDB1 [[14]] dataset. In addition, the approach obtained a 96.67% accuracy and a recall of 96.46% on the ALL-IDB2 [[14]] dataset. To accomplish acute leukemia classification, Das et al. [[35]] suggested transfer learning based on pretrained MobileNetV2 [[36]] architecture on three datasets: ALL-IDB1 [[14]], ALL-IDB2 [[14]], and ASH [[18]]. The classification was done using SVM with 99.39%, 98.21%, and 97.73% accuracy on ALL-IDB1 [[14]], ALL-IDB2 [[14]], and ASH [[18]], respectively. In a similar work, Das et al. [[37]] recommended ResNet18-based deep features with an Orthogonal SoftMax Layer (OSL) on small datasets to detect acute leukemia. To boost network speed and performance, dropout and ReLu layers were added. The approach had 89.67%, 99.09%, 98.08%, and 97.50% accuracy on the C_NMC_2019 [[38]], ALL-IDB1 [[14]], ALL-IDB2 [[14]], and ASH [[28]] datasets. In another approach, Das et al. [[39]] presented a probability-based weight factor for ALL identification to hybridize MobilenetV2 [[36]] with ResNet18. After training on 70% of the ALL-IDB1 and ALL-IDB2 [[14]] datasets and testing on 30%, the approach obtained 99.39% and 97.18% accuracy. A 50% training and 50% testing split yielded 97.92% accuracy for ALL-IDB1 [[14]] and 96.00% for ALL-IDB2 [[14]]. Additionally, using the ALL-IDB1 [[14]] and ASH [[18]] datasets, Das et al. [[40]] suggested a single-layered deep cascade network with sparse-based learning for leukemia identification. The depth cascade network was fed the necessary features computed using traditional LBP. The SoftMax vectors enabled layer-wise learning, and the inverse linear problems were solved using modified fast iterative shrinkage-thresholding algorithm (MFISTA) with L1-norm. Their methodology achieved a classification accuracy of 97.50% for AML and 98.15% for ALL. Rodrigues et al. [[41]] introduced a hybrid model that combines a genetic algorithm (GA) with a pre-trained CNN ResNet-50V2 to detect ALL using the ALL-IDB dataset. GA was employed to identify the optimal hyperparameters, resulting in an accuracy of 98.46%. Hassan et al. [[42]] introduced two methodologies for ALL detection. The first method relies on Knowledge Nevestro Classification (KNC), which involves transferring information from a larger, high-performing instructor model to a smaller model. The second approach uses the Nevestro DenseNet (50) Attention (DAN) model, which integrates attention processes. The model demonstrated accuracy, sensitivity, specificity, precision, and F1-score values of 0.991, 0.9945, 0.9924, 0.9945, and 0.9945, respectively. Chand et al. [[43]] built a 16-layer light CNN model comprising an input layer, 12 feature extraction layers, and three image classification layers (fully connected (FC), SoftMax, and classification). A MaxPooling (MaxPool) layer follows convolution, batch normalization (BN), and ReLU in the feature extraction layers. The model averaged 98.17% accuracy on ALL-IDB [[14]]. Saeed et al. [[44]] created DeepLeukNet, a CNN model comprising input, convolution, pooling, dropout, flattening, and FC layers. The model had 99.61% accuracy on ALL-IDB1 [[14]] and ALL-IDB2 [[14]]. Using the ASH [[18]] dataset, Anilkumar et al. [[45]] developed a CNN model named "LeukNet" influenced by the AlexNet and classified B-ALL and T-ALL cells with 94.12% accuracy. LeukNet has three iterations of convolution, ReLU, and MaxPool layers, followed by two FC layers. The first, second, and third convolution layers have 64, 128, and 256 filters of size 3 × 3. To minimize overfitting, the network makes use of dropout and cross-channel normalization. Dhalla et al. [[46]] introduced a revised CapsNet model for ALL detection using a residual network in the first block. After 20% pruning, the model had 96.97% specificity, 96.81% sensitivity, 96.79% precision, and 97.44% accuracy across all three datasets, including ALL-IDB1 [[14]], ALL-IDB2 [[14]], and C_NMC_2019 [[38]].
+
+As per the literature, the ML-based leukemia detection schemes employ relatively limited and homogenous datasets [[13], [15], [16]–[17], [19], [21], [23]–[24], [26]]. This limitation can hinder the applicability of their models to broader and more heterogeneous populations. The study [[17]] uses low-resolution images, which may limit the suitability of the model for higher-resolution datasets commonly utilized in clinical practice. Due to data restrictions, the study [[22]] could only focus on specific subtypes of AML, which impacted the overall generalization of the model. The study [[23]] reveals a notable disparity in accuracy between classifications at the cell level and classifications at the image level, suggesting the presence of possible inconsistencies. The study [[27]] showed a comparatively lower level of accuracy, implying possible problems with the selection of features or in the classification. The approach [[12]] achieved high accuracy by utilizing complex ensemble classifiers. Nevertheless, small datasets are particularly susceptible to overfitting. Though the approach [[25]] obtained good accuracy, the limitation of the study is that it was not tested on different staining methodologies. The study [[ 8 ]] utilized a sizeable dataset comprising 500 smear images for the ML-based classification approach. However, the accuracy rate obtained through ML-based approaches was lower. The study [[13]] applied an optimization strategy for better performance of SVM utilizing a small dataset like ALL-IDB1 [[14]]. However, dealing with a larger dataset is computationally expensive. Furthermore, it has been observed that the ML-based approaches employ various stages, including segmentation, feature extraction, and classification. The segmentation stage uses several techniques, such as K-means clustering, fuzzy-based color segmentation, marker-controlled watershed, and ellipse fitting. Various methods are adapted to calculate features, such as GLCM, GLRLM, HOG, LBP, Haralick, HD, contour signature, wavelets, statistical, shape, and color features. Common classifiers include SVM, RBFN, MLP, NB, BP, and K-NN. The effectiveness of these methods depends on the precise segmentation of WBC and the use of manually designed features. Nevertheless, the precise segmentation of WBC is a challenging task because of the inhomogeneity among blood cells, the presence of noise, the weakness of edges, the selection of seed points, and over-segmentation [[28]]. Moreover, the manually designed features (handcrafted features) may fail to consider the crucial characteristics of leukemic cells.
+
+DL-based leukemia detection approaches surpass classical ML approaches without requiring an additional segmentation step, which is often necessary in ML. The DL-based techniques [[ 4 ], [ 8 ], [32], [34]–[35], [37], [39], [41], [43], [44]–[45]] use a range of methodologies such as CNN, transfer learning using different pre-trained CNNs (VGG16, ResNet50, DenseNet121, DenseNet201, MobileNetV2), fine-tuning, attention mechanisms, and capsule networks. However, there exist certain limitations in DL-based approaches. The study [[32]] employed a limited dataset, constraining its relevance to broader and more heterogeneous datasets. The work [[ 4 ]] used multiple CNNs for feature extraction, making the model more complex and requiring more computational resources. The work [[33]] obtained high accuracy using the ACGAN classifier on some datasets. However, more validation is needed to determine its applicability over a wider variety of data and a diverse population. The dataset sizes for works [[ 8 ]] and [[ 9 ]] are 500 and 1250 images for 3-class and 5-class classifications, respectively. However, the number of images is insufficient to construct a robust training model. Furthermore, the accuracy of work [[ 9 ]] is 84%, indicating space for improvement. The works [[34], [36], [38], [39]–[40], [44]] achieved high accuracy on smaller datasets such as ALL-IDB1 [[14]], ALL-IDB2 [[14]], and the ASH [[18]] image bank. However, it is unclear how effective their models would be on larger and more diverse datasets and the possibility of overfitting issues. The study [[41]] used a genetic algorithm to optimize hyperparameters, which led to complexity and processing costs, making it difficult for practical application. The work [[42]] utilized knowledge transfer from larger models, which may not always be helpful in clinical environments. The work [[43]] achieved high accuracy using a 16-layer light CNN model. However, the model's evaluation was only conducted on a single dataset, which restricts its capacity to be applied to other datasets. Similarly, the work [[46]] encounters problems related to overfitting and computational complexity, especially in various clinical environments.
+
+One major problem of DL-based approaches, especially in the area of medical image analysis, is the absence of large, well-annotated datasets; for instance, the standard CNN model encounters overfitting problems due to sampling noise when trained with limited data. The commonly used strategies like dropout and early stopping to handle overfitting may lead to immature training stops of the model. Moreover, the existing methods have relied on small and homogeneous datasets consisting of images that were acquired using identical camera specifications, magnification, and size [[26], [32], [45]]. However, Abhishek et al. [[ 8 ]] made an effort to generate a heterogeneous dataset by mixing their private dataset with an online dataset. The heterogeneous datasets are characterized by their diversity in terms of various sources, captured under various lighting conditions and camera specifications, which can enhance a model's ability to generalize well to new unseen data. Therefore, there is scope for more developmental research on heterogeneous datasets to identify acute leukemia, which is the primary motivation behind this work.
+
+As mentioned earlier, overfitting is a major challenge of the DL-based leukemia detection scheme due to the insufficiency of leukemic smear images. In addition, the DL-based leukemia detection methodologies commonly employed a uniform normalization (mostly batch normalization) across all layers, resulting in suboptimal outcomes. The process of selecting distinct normalization types for certain problems posed challenges in the model construction. To cope with these challenges, the block feature map distortion (BFMD) strategy is combined with switchable normalization (SN) to design a novel BSNEU-net framework for acute leukemia detection. This paper outlines the primary contributions as follows:
+
+Two new datasets are introduced to address the insufficiency of acute leukemia smear images.
+Novel dataset: Introducing a novel dataset comprising microscopic blood smear images categorized into three distinct categories, namely ALL, AML, and Healthy WBC. The dataset was collected via collaboration with Dr. Bhubaneswar Borooah Cancer Institute in Guwahati, India, after obtaining permission from the Institutional Ethics Committee. The dataset comprises 2400 smear images captured from thin blood smear slides that were stained using Leishman and Giemsa stain with a resolution of 2592 × 1944 pixels. The images are captured at two distinct magnifications: × 400 and × 1000. A total of 261 images are acquired using a magnification of × 400, while the remaining 2139 images are collected using a magnification of × 1000.
+Heterogeneous dataset: A heterogeneous dataset consisting of 2700 images is created by combining four publicly accessible benchmark datasets, including Kaggle ALL [[47]], ALL-IDB1 [[14]], ASH [[18]], and Munich AML Morphology (AML-Cytomorphology_LMU) [[48]].
+This work proposes a novel BSNEU-net framework for acute leukemia detection. It is constructed by combining 4 Union Blocks where the BFMD and SN layers are appended following each convolution layer of Union Blocks.
+The BFMD is adapted to improve the model's generalization ability by adding distortions to the feature maps. Further, it aids in minimizing overfitting in the network by mitigating its reliance on particular properties of the training data, hence facilitating the acquisition of more generalized patterns.
+The SN layer is combined with BFMD to enhance the model's convergence and generalization performance since the uniform utilization of batch normalization following convolution layers is sensitive to mini-batch dimension changes. In addition, the SN provides the flexibility to employ several normalizations that make it more robust against minibatch dimension changes.
+Moreover, three key points are utilized in the comparative investigations. Initially, the experimental results obtained using the proposed strategy are compared with pre-trained CNNs like VGG16 [[49]], VGG19 [[49]], ResNet50V2 [[50]], DenseNet121 [[51]], MobileNet [[52]], Xception [[53]], and InceptionV3 [[54]]. Secondly, alongside the proposed strategy, the various methodologies from the literature are directly applied to both datasets, and their performance is compared. As a last step, the proposed methodology is compared against existing leukemia detection systems available in the literature in terms of accuracy, precision, recall, and specificity.
+Materials and Methods
+This section is divided into two sections: dataset description and model construction. The "Dataset Description" section describes two datasets utilized in this work. The "Model Construction" section elaborates on the construction process of the DL-based proposed BSNEU-net framework for the efficient detection of acute leukemia.
+
+Dataset Description
+Novel Dataset
+A new dataset consisting of peripheral blood smear images is created to identify and classify leukemia using the deep learning-based approach. A total of 2400 microscopic images of ALL, AML, and healthy cases have been gathered from 62 peripheral blood smears diagnosed with acute leukemia and 38 peripheral blood smears of healthy cases. These samples were collected from 100 anonymous people who participated in the study. Among them, 31 people are diagnosed with ALL, 31 people are diagnosed with AML, and 38 people are healthy. The collection of images is carried out during a clinical trial conducted in partnership with Dr. Bhubaneswar Borooah Cancer Institute, India, from December 2022 to December 2023. The data collection is conducted with the endorsement of institutional ethics committees and in accordance with ethical standards. Consent was obtained from all participants and their caretakers after providing them with relevant information.
+
+The dataset was carefully annotated in collaboration with the onco-pathology department at Dr. Bhubaneswar Borooah Cancer Institute, Guwahati, India. The onco-pathology department had two experienced pathologists with over 12 years of experience in hematopathology who provided the morphological and immunophenotypic diagnosis of ALL and AML cells, along with the coordinates of the centroids of these cells. These two experienced pathologists manually annotated the dataset throughout the acquisition process. Further, to ensure accuracy in labeling, the opinions of two independent experts were obtained for each blood sample. The experts determine whether a blood sample is malignant and identify its specific subcategory of acute leukemia, i.e., ALL or AML. If the opinions of both experts concurred, the blood sample was assigned the corresponding label. In cases where the expert's opinions differed, the sample was excluded from the study to maintain the integrity of the dataset. All patient data were anonymized to protect privacy and comply with ethical standards.
+
+The peripheral blood smear slides are prepared in the traditional manner by the technologist as per the instructions of the pathologist. It is necessary to collect 2 mL of blood in an EDTA vacutainer. A single drop of blood is applied to a sterile slide using the wedge method to prepare a smear. The smear is then allowed to air dry. The smear is first stained with Leishman stain, and after 3 min, the Giemsa stain is stained with 1:10 dilutions for 15 min. After rinsing it under running water, the slide is allowed to air dry [[55]]. From the prepared slide, images of blood cells are captured using a Leica B4 microscope equipped with a digital color camera Leica ICC50W (5 mega-pixels). The whole setup consists of a computer, a camera, and a connected microscope. We record all of our images in RGB color space, which consists of three channels, each with 8 bits of depth. The objective lenses used to acquire the images are 40× and 100×, respectively, and the magnifications of 400× and 1000× are equivalent. Figure 1 displays the sample images of the novel dataset. The top row contains samples of ALL cases, whereas the second and third rows include samples of AML and healthy individuals, respectively. The images captured at a magnification of 400× are displayed in the first column, while the images captured at a magnification of 1000× are displayed in the second and third columns. The pathologist uses the microscope to examine the slide and locate a region of interest (ROI). After that, they take a digital image at a magnification of 400×. A more enlarged image of blood cells, especially WBC, was obtained when the magnification was adjusted to 1000×. The JPEG format is used to store all the digital images with a dimension of 2592 × 1944 pixels. Our study focuses on instances of leukemia, namely ALL and AML. The study excludes individuals with other hematological or hematolymphoid malignancies. The overall summary of the novel dataset is presented in Table 1.
+
+Graph: Fig. 1 Sample smear images from the novel dataset. (a)–(c) ALL images. (d)–(f) AML images. (g)–(i) Healthy images. The first column represents the images acquired at 400×, whereas the second and third columns represent the images acquired at 1000×
+
+Table 1 Summary of the novel dataset
+
+
+Magnifications
+
+ALL
+
+AML
+
+Healthy
+
+Total
+
+400 
+
+87
+
+87
+
+87
+
+261
+
+1000 
+
+713
+
+713
+
+713
+
+2139
+
+Total
+
+800
+
+800
+
+800
+
+2400
+
+No. of subjects
+
+31
+
+31
+
+38
+
+100
+
+The labeled sample images manually done by pathologists are displayed in Fig. 2. The database now has 2400 images, with 800 images for each class, namely ALL, AML, and healthy.
+
+Graph: Fig. 2 Sample of labeled images manually done by pathologists from the novel dataset. The first row (a)–(c) represents ALL cases, and the second row (d)–(f) represents AML cases. The red arrows (a)–(f) indicate blast cells. The black arrow of (a) indicates a large granular lymphocyte, and the small red circle of (e) indicates an Auer rod found in AML cases
+
+Heterogeneous Dataset
+The publicly accessible four datasets, including Kaggle ALL [[47]], ALL-IDB1 [[14]], ASH [[18]], and Munich AML Morphology (AML-Cytomorphology_LMU) [[48]], are combined to construct a heterogeneous dataset. The Kaggle ALL dataset [[47]] was prepared in the bone marrow laboratory of Taleqani Hospital, Tehran, Iran, from 89 ALL patients. The dataset comprises three subtypes of ALL namely Early Pre-B, Pre-B, and Pro-B ALL. The images were captured using a Zeiss camera in a microscope with 100× magnification and stored in JPG format. In contrast, the ALL-IDB1 [[14]] dataset was created in September 2015, comprising 108 images that were captured using a Canon PowerShot G5 camera attached to an optical laboratory microscope. Out of the 108 images, 59 were obtained from healthy subjects, and 49 were obtained from ALL patients. The captured images are in JPEG format and have a resolution of 2592 × 1944 pixels, a color depth of 24 bits, and magnifications ranging from 300 to 500. Conversely, the ASH image bank [[18]] is a digital repository containing a vast collection of images of various hematopoietic topics. The ASH [[18]], which underwent a recent redesign and was launched in March 2016, comprises an extensive collection of over 2100 images of various hematological disorders. In addition, the image bank undergoes regular updates through the continuous inclusion of new images. The AML-Cytomorphology_LMU [[48]] dataset comprises 18,365 expert-labeled single-cell smear images. The images were captured from 100 AML patients and 100 normal individuals at Munich University Hospital in the years between 2014 and 2017. The images were captured using an M8 digital microscope at 100-fold optical magnification and oil immersion. Further, the expert specialists used a clinically proven morphological categorization method to distinguish between pathogenic and non-pathological leukocytes. The heterogeneous dataset comprises a total of 2700 images, as summarized in Table 2.
+
+Table 2 Summary of the heterogeneous dataset
+
+
+Categories
+
+Datasets
+
+No. of images
+
+Total
+
+ALL
+
+ALL-IDB1 [14]
+
+Kaggle ALL dataset [47]
+
+49
+
+851
+
+900
+
+AML
+
+ASH [18]
+
+AML_Cytomorphology_LMU [48]
+
+59
+
+841
+
+900
+
+Healthy
+
+ALL-IDB1 [14]
+
+AML_Cytomorphology_LMU [48]
+
+59
+
+841
+
+900
+
+Total
+
+2700
+
+Figure 3 displays the sample images from the heterogeneous dataset. In Fig. 3, (a) depicts ALL images from Kaggle ALL dataset [[47]], (b) depicts ALL images from ALL-IDB1 [[14]], (c) depicts AML images from ASH [[18]], (d) depicts AML images from AML_Cytomorphology_LMU [[48]], (e) depicts healthy images from AML_Cytomorphology_LMU [[48]], and (f) depicts healthy images from ALL-IDB1 [[14]].
+
+Graph: Fig. 3 Sample smear images from the heterogeneous dataset: (a)-(b) ALL cases, (c)-(d) AML cases, and (e)-(f) represents healthy cases
+
+Model Construction
+This paper proposed an enhanced Union-net model called "BSNEU-net" to detect ALL, AML, and healthy cases. It is constructed by combining 4 Union Blocks where the BFMD and SN layers are newly appended following each convolution layer of Union Blocks. The BFMD strategy is adapted to minimize overfitting in the network by mitigating its reliance on particular properties of the training data, hence facilitating the acquisition of more generalized patterns. The SN layer provides the flexibility to employ several normalizations, making it more robust against minibatch dimension changes. Thus, the adaptation of the SN layer addresses the issue of reducing the sensitivity of mini-batch dimension changes in the original Union-net [[56]], where the uniform normalization (batch normalization) is applied across all convolution layers. In summary, the combined strategy of BFMD with the SN layer enhances the model's convergence and generalization performance.
+
+Block Feature Map Distortion (BFMD)
+CNN-based models trained with limited samples are prone to overfitting due to sampling noise, which results in poor performance during testing [[57]]. One of the most popular methods to prevent overfitting is called dropout [[58]]. On the other hand, the Disout [[59]] regularization algorithm promises to learn the distortion of the feature map by reducing the network's empirical Rademacher complexity (ERC). This contrasts with the traditional approach of fixing the value of perturbation. Furthermore, CNNs exhibit spatially correlated features. To enhance the effectiveness of Disout in CNNs, the method also introduces the distortion of specific semantic information, similar to the technique proposed by DropBlock [[60]]. Block feature map distortion (BFMD) is considered a more beneficial regularization technique for CNN. The procedure for training the neural network is as follows: Initially, the algorithm computes the feature map of the specific layer 
+ . Subsequently, it generates the distortion e and the accompanying sample mask M . Next, it derives the distorted feature map 
+ and proceeds to feed forward the network using this distorted feature map. This process is applied to all layers, and subsequently, the weights are updated through backpropagation. Mathematically, the BFMD can be expressed by Eq. ( 1 ).
+
+1
+
+Graph
+
+In Eq. ( 1 ),  represents the input data, 
+ represents the feature map of the p-th layer, 
+ represents the distorted feature map, M represents the binary mask,  denotes element-wise multiplication, and e denotes the distortion applied to the feature map. The optimization of " e " in the p-th layer is guided by ERC in the (p + 1)-th layer. The ERC guide automatically learns " e " instead of fixing its value. The integer j takes values between 1 and the number of input samples.
+
+Switchable Normalization (SN)
+The normalization strategy is a highly effective approach frequently employed in DL to enhance the performance of natural language processing and computer vision [[61]]. One primary advantage of employing normalization in DL-based depth networks is the acceleration of convergence. As a result of the normalization layer's regularization effect, both training duration and performance are enhanced during this stabilization phase [[62]]. As per the literature, the existing leukemia detection methodologies commonly employed a uniform normalization type across all layers, resulting in suboptimal outcomes. The process of selecting distinct normalization types for certain issues posed challenges in model construction [[61]]. SN is a proposed solution by [[61]] that addresses this issue. SN allows for the use of various normalization techniques in multiple layers and integrates the statistical properties of three specific normalization approaches: IN [[62]], BN [[63]], and LN [[64]]. SN employs three normalizations in certain issues by alternating between three types of normalization and acquiring their respective relevance weights through learning [[61]]. SN enables the utilization of normalizers by granting each normalization component in the network the ability to independently carry out its operations and extend the boundaries of normalization in DL [[65]]. In many problems, utilizing mixtures of these three normalizations is often more efficient than relying on just one normalization approach. For instance, three normalizers are favored for addressing object recognition and classification issues [[61]]. The flexibility of employing several normalizations makes SN more robust against minibatch dimension changes. Opting for a smaller batch size will result in an increased impact of random noise originating from the batch statistics of BN. In order to mitigate this issue, SN decreases the importance of BN and instead enhances the significance of LN. This approach minimizes the impact of regularization from batch normalization and enhances the ability to learn through layer normalization. Thus, SN offers a combination of learning and generalization capabilities [[61], [65]].
+
+2
+ 
+
+Graph
+
+In Eq. ( 1 ),  and 
+ denote the original and normalized pixels values obtained from 4D-input tensor, where 4D-tensor contains number of samples (N), number of channels (C), height (H), and width (W). The value range of n , c , h , and w are 1 to N, 1 to C, 1 to H, and 1 to W, respectively.  denotes the shift parameter, and δ denotes the scaling parameter.  is a minute constant for ensuring the preservation of numerical stability.  denotes a group of moment statistics. The scalar variables  and 
+ are adapted to assign weights to the means (μ) and variances (  ), respectively, expressing their important ratios. These parameters accept dynamic values ranging from 0 to 1 and are learned using backpropagation. δ is adapted to discriminate BN, IN, and LN approaches.
+
+Proposed BSNEU-net Framework
+The BFMD and SN-based proposed BSNEU-net framework is constructed using 4 Union Blocks, as displayed in Fig. 4, which is the primary building block of the overall acute leukemia detection scheme. The BFMD and SN layers that follow the convolution layers of each Union Block (as displayed in Fig. 5) and the activation function (ReLU) are discarded from Fig. 4 due to limited space. The " + " symbol is incorporated throughout each Union Block (UB), representing the combination and addition of the results obtained from the four network unit groups within the block. Nevertheless, the fusion mechanism employed by the proposed BSNEU-net is distinct from the fusion techniques employed by the Xception [[53]] and Inception [[66]] configurations. Both Inception and Xception configurations employ the channel splicing technique, sometimes known as "concatenate" [[66]]. As a result, the Xception and Inception models modify the shape of the feature map output, leading to a rise in the number of channels. The BSNEU-net framework can be described as an integrator that combines the information from multiple features. After the addition is performed, the dimension of the resulting feature and the number of channels remain unchanged. The output produced by the UB-1 is then used as input for the UB-2. Similarly, the output generated by the UB-2 is used as the input for the UB-3, and the output produced by the UB-3 is then used as the input for the UB-4. Ultimately, the merging procedure yields the amalgamation of UB-4 with the outputs of UB-1, UB-2, and UB-3, as illustrated in Fig. 4.
+
+Graph: Fig. 4 Proposed BSNEU-net framework
+
+Graph: Fig. 5 Proposed single Union Block structure appending the BFMD and SN layers
+
+Each UB is structured by employing 4 parallel CNN structural unit groups, as displayed in Fig. 5. Each group receives the same input (X). The structural unit containing a single convolution layer provides the output  as defined in Eq. ( 3 ). Similarly, the structural units containing two, three, and four convolution layers provide the outputs  ,  , and  , respectively. The corresponding mathematical expressions of  ,  , and  are formulated in Eqs. ( 4 )–( 6 ), respectively. Within this particular framework, the input X is assigned a weight denoted as w , while the bias parameter is denoted as β . Furthermore, the activation function is represented by the symbol α .
+
+3
+
+Graph
+
+4
+
+Graph
+
+5
+
+Graph
+
+6
+
+Graph
+
+By combining Eqs. 3–6, the general realization of the union module may be represented through Eq. ( 7 ), where  denotes the input from the preceding convolutional layer,  represents the 4 sets of CNN groups, and  signifies the specific convolutional layer associated with each set of convolutional neural networks.
+
+7
+
+Graph
+
+The four sets of CNN structural units of each UB execute "complex convolution processing" when it receives one input. The output of the UB is obtained by aggregating the processing results of each CNN group. Therefore, each UB is referred to as a union convolution block, which is called a union convolution. Therefore, Fig. 4 can be represented using the union convolution approach, as displayed in Fig. 6.
+
+Graph: Fig. 6 Simplified representation of BFMD + SN-based proposed BSNEU-net framework using union convolution concept
+
+Overall Proposed Architecture for Detecting Acute Leukemia
+The overall proposed acute leukemia detection architecture comprises an input layer, the proposed BSNEU-net framework followed by a  convolutional layer, a Global Average Pooling (GAP) layer, and a SoftMax classification layer as depicted in Fig. 7. Analyzing the model structure from Fig. 7, the proposed methodology has the following salient features:
+
+The proposed overall architecture for acute leukemia detection is simple. It comprises a proposed BSNEU-net framework followed by a final convolution layer (128 × 3 × 3), a BFMD + SN layer, a GAP layer, and a SoftMax classification layer. Each UB comprises a combination of single and multiple convolutions where the BFMD + SN layers are utilized after each convolution operation.
+Each convolution operation in UB employs a  convolution kernel with regard to minimizing the number of model parameters and computational complexity.
+The BFMD is applied to improve the model's generalization ability by adding distortions to the feature maps. Further, it aids in minimizing overfitting by mitigating its reliance on particular properties of the training data, hence facilitating the acquisition of more generalized patterns.
+The single-use of batch normalization across all layers in the original Union-net [[56]] is sensitive to mini-batch dimension changes. Thus, SN is appended in the enhanced Union-net (proposed BSNEU-net), which provides the flexibility to employ several normalizations (BN, IN, and LN) that make the model more robust against minibatch dimension changes.
+The initial Union Block incorporates utilizing a MaxPooling layer [[67]]. Based on the ideas mentioned in the literature [[67]], it has been suggested that the utilization of MaxPooling can effectively mitigate the impact of parameter errors in the convolutional layer, hence minimizing the variation in the estimated mean value. Additionally, MaxPooling has the advantage of preserving a more significant amount of texture information. MaxPooling is a technique capable of maintaining more efficient features, reducing dimensions, minimizing parameters, and eliminating noise. These advantages provide significant benefits in terms of feature extraction and mitigating the issue of overfitting.
+Each Union Block is designed using four groups of separate parallel CNN architectures, as depicted in Fig. 5, where each group operates independently. Subsequently, the outputs generated by each group are merged to form a unified output.
+The unified output of the proposed BSNEU-net is inputted to the final convolutional layer (  ) of overall architecture, followed by a BFMD + SN layer and a GAP layer with a SoftMax classification layer.
+The GAP layer is employed as a substitute for the FC layer to reduce the number of model parameters further.
+Graph: Fig. 7 Overall configuration of the proposed scheme for acute leukemia detection
+
+Experimental Protocol
+The ML and DL-based methodologies encounter various threats during validation. To handle the potential threats to validation, we have adopted the following strategies during the developmental stages of our proposed leukemia detection model.
+
+Splitting of the dataset: Initially, we split our dataset in such a way that the images from the same patient ID are confined to a single subset to ensure no overlap between the training, validation, and test sets. Prior to splitting, the patient IDs were shuffled randomly to maintain randomness and prevent any ordering effects. We maintained 70% of images for training, 10% for validation, and 20% for testing. The splitting summary of both datasets is presented in Table 3.
+Balanced dataset: The novel dataset introduced in this work is a balanced dataset that helps in preventing over or under-representation of classes in different subsets.
+Preprocessing: The input images are resized to 224 × 224 pixels for the proposed scheme as well as for the pretrained CNNs, specifically VGG16 [[47]], VGG19 [[47]], ResNet50V2 [[48]], DenseNet121 [[49]], and MobileNet [[50]]. However, for pretrained CNNs, namely Xception [[51]] and InceptionV3 [[52]], the input images are resized to 299 × 299 pixels. The smear images were taken at various times and settings. As a result, before feeding images as input to CNN models, they must be normalized. Min–max scaling [[68]] is used for this purpose.
+Overfitting mitigation: Overfitting is one of the major threats to validation in any ML and DL-based approaches. We utilized various data augmentation techniques, including rotation, horizontal and vertical flipping, height and width shifting, shearing, and zooming, in order to improve the model generalization capability to unseen data. The augmentation was carried out using the "ImageDataGenerator" class from the Keras package [[69]]. It improves the training dataset by artificially increasing its size and incorporating diversity, thus enhancing the model's robustness and performance. In addition, we have utilized the regularization strategy BFMD to handle the overfitting issue effectively. Moreover, a linear decrease in the learning rate strategy provided by the "ReduceLROnPlateau" class of Kears [[69]] was adapted during training to address overfitting further.
+Hyperparameter configuration: We have experimented with multiple permutations of batch sizes, epochs, optimizers, and initial learning rates throughout the training process. The distinct validation set, separate from the training and test sets, was used exclusively for hyperparameter configuration to avoid any leakage and ensure unbiased evaluation. After careful experimentation, the hyperparameters are finalized, as presented in Table 4.
+Independent test set: At the completion of the training process, the model was saved and evaluated on a separate test set that was not used during training or validation. This ensures an unbiased assessment of the model's performance on truly unseen data.
+Statistical analysis: The experimental results of the proposed scheme were statistically analyzed using Student's t -test to evaluate their statistical significance [[71]].
+Table 3 Splitting summary of the novel and heterogeneous datasets
+
+
+Classes
+
+Novel dataset
+
+Heterogeneous dataset
+
+Train
+
+Valid
+
+Test
+
+Train
+
+Valid
+
+Test
+
+ALL
+
+560
+
+80
+
+160
+
+630
+
+90
+
+180
+
+AML
+
+560
+
+80
+
+160
+
+630
+
+90
+
+180
+
+Healthy
+
+560
+
+80
+
+160
+
+630
+
+90
+
+180
+
+Total
+
+1680
+
+240
+
+480
+
+1890
+
+270
+
+540
+
+Table 4 Hyperparameter settings
+
+
+Hyperparameters
+
+Value
+
+Initial learning rate
+
+0.0001
+
+Batch size
+
+8
+
+Epoch
+
+100
+
+Decay rate of Adam [70] optimizer (β1, β2)
+
+0.9, 0.999
+
+Denominator offset of Adam (ϵ)
+
+
+Adam = adaptive moment estimation
+
+The investigations were carried out using the Python-based open-source neural network toolkit Keras [[67]] on a workstation equipped with a 3.20 GHz Intel Xeon processor, 32 GB of RAM, and a 16 GB dedicated memory Nvidia Quadro RTX 5000 graphics card. The effectiveness of the proposed methodology was assessed using the performance metrics, including accuracy, precision, recall, F1-score, and specificity. Moreover, this paper deals with the 3-class classification problem. Thus, the following equation is employed for the calculation of overall accuracy from the confusion matrix [[ 8 ]].
+
+8
+ 
+
+Graph
+
+Statistical Analysis
+The statistical analysis is carried out using Student's t -test to find significant differences in the configuration of each performance metric [[71]]. All the statistical tests were two-sided, and the P < 0.05 was considered statistically significant.
+
+Results
+The selection of 4 Union Blocks with the BFMD + SN layer for the proposed leukemia detection scheme can be justified by Table 5. The Union-net-3 configuration is constructed by removing the last union block (UB-4) from the proposed leukemia detection scheme and replacing the last convolution layer with another convolution layer of size 3 × 3 × 64. Next, the Union-net-5 configuration is constructed by adding an additional union block (UB-5) after UB-4 in the proposed leukemia detection scheme. The UB-5 has similarities to other Union Blocks, as shown in Fig. 5. It comprises 4 groups of CNNs, but the number of filters each group utilizes is 256. Subsequently, the final convolution layer for the Union-net-5 configuration is set to 3 × 3 × 256. According to Table 5, the BFMD + SN layer-based proposed enhanced Union-net configuration (BSNEU-net) outperformed the Union-net-3 and Union-net-5 with the accuracy enhancement of 2.08% and 1.87% on the novel dataset. In the context of the heterogeneous dataset, the proposed BSNEU-net demonstrated superior performance compared to the Union-net-3 and Union-net-5 models, with accuracy improvements of 2.04% and 1.85%, respectively. The statistical analysis also signifies the superiority of the proposed scheme over other Union-net configurations, as demonstrated in Table 6. From Table 6, it can be observed that the proposed methodology achieved better accuracy of 99.37% and 99.44% on the novel and heterogeneous datasets, respectively. It outperformed the group of other Union-net configurations, which had mean accuracies of 97.39% and 97.49% on the novel and heterogeneous datasets, respectively. Furthermore, the P values corresponding to both novel and heterogeneous are less than 0.05, which indicates that the proposed methodology is statistically significant compared to other Union-net configurations in terms of accuracy.
+
+Table 5 The performance of the proposed model and various Union-net configurations on both datasets
+
+
+Various Union-net configurations
+
+(%) on the novel dataset
+
+(%) on the heterogeneous dataset
+
+Union-net-3
+
+97.29
+
+97.40
+
+Union-net-5
+
+97.50
+
+97.59
+
+Proposed BSNEU-net
+
+99.37
+
+99.44
+
+represents overall accuracy. Bold values signify optimum performance
+
+Table 6 Comparison of the proposed model and other Union-net configurations
+
+
+Performance metrics
+
+Datasets
+
+Proposed method
+
+Other Union-net configurations
+
+P value
+
+Overall Accuracy
+
+Novel
+
+99.37%
+
+97.39%
+
+0.0338
+
+Heterogeneous
+
+99.44%
+
+97.49%
+
+0.0310
+
+Table 7 demonstrates the performance of the BFMD + SN layer and other normalization layers (IN, LN, and BN) on the novel and heterogeneous datasets. The results indicate that the application BFMD + SN leads to 3.12%, 2.70%, and 2.29% accuracy improvements corresponding to the IN, LN, and BN layers on the novel dataset. In the context of the heterogeneous dataset, the accuracy improvements are 3.15%, 2.41%, and 2.04%.
+
+Table 7 Performance of the proposed method with BFMD + SN layers and other normalization layers
+
+
+Approaches
+
+(%) on the novel dataset
+
+(%) on the heterogeneous dataset
+
+Proposed method with IN
+
+96.25
+
+96.29
+
+Proposed method with LN
+
+96.67
+
+97.03
+
+Proposed method with BN
+
+97.08
+
+97.40
+
+Proposed method with BFMD + SN
+
+99.37
+
+99.44
+
+represents overall accuracy. Bold values signify optimum performance
+
+The statistical analysis also reveals significant differences, as presented in Table 8. According to Table 8, the proposed methodology with BFMD + SN layers achieved better accuracy of 99.37% and 99.44% on the novel and heterogeneous datasets, respectively. It outperformed the other normalization layers (IN, LN, and BN), which had mean accuracies of 96.66% and 96.90% on the novel and heterogeneous datasets, respectively. In addition, the P values presented in Table 8 are less than 0.05 for both datasets, which establishes that the proposed scheme is statistically significant compared to other normalization strategies in terms of accuracy.
+
+Table 8 Comparison of the proposed model with BFMD + SN layers and other normalization layers
+
+
+Performance metrics
+
+Datasets
+
+The proposed method with BFMD + SN layers
+
+Proposed method with other normalization layers
+
+P value
+
+Overall Accuracy
+
+Novel
+
+99.37%
+
+96.66%
+
+0.0077
+
+Heterogeneous
+
+99.44%
+
+96.90%
+
+0.0161
+
+The accuracy and loss curves for the proposed methodology, corresponding to the novel and the heterogeneous datasets are displayed in Figs. 8 and 9, respectively. Analyzing Figs. 8 and 9, it is observed that the validation curves converge close to the training curves and do not deviate from the training curves. Further, the loss curves signify that the proposed BSNEU-net has no instance of overfitting during training across both novel and heterogeneous datasets.
+
+Graph: Fig. 8 (a) Accuracy and (b) loss curves during training and validation over the novel dataset using the proposed BSNEU-net
+
+Graph: Fig. 9 (a) Accuracy and (b) loss curves during training and validation over the heterogeneous dataset using the proposed BSNEU-net
+
+The performance of the proposed methodology and various pretrained CNNs on the novel dataset is demonstrated in Table 9. Analyzing Table 9, it is observed that the proposed scheme achieved superior performance compared to pre-trained CNNs specifically, VGG16, VGG19, ResNet50V2, DenseNet121, MobileNet, Xception, and InceptionV3 on the novel dataset.
+
+Table 9 Performance of the proposed leukemia detection scheme and pretrained CNNs on the novel dataset
+
+
+Methods
+
+Classes
+
+Ac (%)
+
+Pr (%)
+
+Re (%)
+
+Fs (%)
+
+Sp (%)
+
+VGG16
+
+ALL
+
+95.20
+
+91.51
+
+94.37
+
+92.92
+
+95.62
+
+AML
+
+96.25
+
+94.93
+
+93.75
+
+94.33
+
+97.50
+
+Healthy
+
+97.70
+
+97.45
+
+95.62
+
+96.52
+
+98.75
+
+VGG19
+
+ALL
+
+95.83
+
+94.30
+
+93.12
+
+93.71
+
+97.18
+
+AML
+
+95.41
+
+92.59
+
+93.75
+
+93.16
+
+96.25
+
+Healthy
+
+98.33
+
+97.50
+
+97.50
+
+97.50
+
+98.75
+
+ResNet50V2
+
+ALL
+
+93.33
+
+89.02
+
+91.25
+
+90.12
+
+94.37
+
+AML
+
+93.54
+
+90.56
+
+90.00
+
+90.28
+
+95.31
+
+Healthy
+
+98.54
+
+98.72
+
+96.87
+
+97.79
+
+99.37
+
+DenseNet121
+
+ALL
+
+91.25
+
+90.41
+
+82.50
+
+86.27
+
+95.62
+
+AML
+
+92.70
+
+84.15
+
+96.25
+
+89.79
+
+90.93
+
+Healthy
+
+97.70
+
+99.33
+
+93.75
+
+96.46
+
+99.68
+
+MobileNet
+
+ALL
+
+92.29
+
+85.54
+
+92.50
+
+88.88
+
+92.18
+
+AML
+
+92.70
+
+91.39
+
+86.25
+
+88.74
+
+95.93
+
+Healthy
+
+98.75
+
+99.35
+
+96.87
+
+98.10
+
+99.68
+
+Xception
+
+ALL
+
+94.79
+
+87.70
+
+98.12
+
+92.62
+
+93.12
+
+AML
+
+94.58
+
+91.87
+
+91.87
+
+95.93
+
+91.87
+
+Healthy
+
+95.20
+
+98.58
+
+86.87
+
+92.35
+
+99.37
+
+InceptionV3
+
+ALL
+
+93.12
+
+83.59
+
+98.75
+
+90.54
+
+90.31
+
+AML
+
+95.41
+
+96.00
+
+90.00
+
+92.90
+
+98.12
+
+Healthy
+
+95.62
+
+99.29
+
+87.50
+
+93.02
+
+99.68
+
+Proposed
+
+ALL
+
+99.37
+
+98.15
+
+100.00
+
+99.07
+
+99.06
+
+AML
+
+100.00
+
+100.00
+
+100.00
+
+100.00
+
+100.00
+
+Healthy
+
+99.37
+
+100.00
+
+98.12
+
+99.05
+
+100.00
+
+A c = accuracy, P r = precision, R e = recall, F s = F1-score, and S p = specificity. Bold values signify optimum performance
+
+To perform statistical analysis on Table 9, the mean values of precision, recall, F1-score, and specificity are considered for each model by averaging the values of three classes (macro-average), i.e., ALL, AML, and healthy. However, the accuracy of each model is considered from the calculated values using Eq. ( 8 ). The statistical analysis obtained through the t -test for each performance metric is demonstrated in Table 10. Analyzing Table 10, it is evident that the proposed scheme attained better accuracy (99.37%), precision (99.38%), recall (99.37%), F1-score (99.37%), and specificity (99.68%) in the classification of acute leukemia on the novel dataset. It outperformed the pre-trained CNNs group, which had mean accuracy (92.73%), mean precision (93.03%), mean recall (92.73%), mean F1-score (92.94%), and mean specificity (96.16%) across the novel dataset. Moreover, the P values of each performance metric, namely accuracy, precision, recall, F1-score, and specificity are less than 0.05 on the novel dataset. This signifies that the proposed methodology is statistically significant compared to other pre-trained CNN models on the novel dataset concerning each performance metric.
+
+Table 10 Comparison of the proposed model with other pretrained CNNs on the novel dataset
+
+
+Performance metrics
+
+Proposed model
+
+Pretrained CNNs
+
+P value
+
+Accuracy (%)
+
+99.37
+
+92.73
+
+
+Precision (%)
+
+99.38
+
+93.03
+
+
+Recall (%)
+
+99.37
+
+92.73
+
+
+F1-score (%)
+
+99.37
+
+92.94
+
+
+Specificity (%)
+
+99.68
+
+96.16
+
+
+The performance of the proposed methodology and various pretrained CNNs on the heterogeneous dataset is demonstrated in Table 11. From Table 11, it has been observed that the proposed scheme achieved excellent performance in terms of accuracy, precision, recall, F1-score and specificity compared to VGG16, VGG19, ResNet50V2, DenseNet121, MobileNet, Xception, and InceptionV3 on the heterogeneous dataset.
+
+Table 11 Performance of the proposed leukemia detection scheme and pretrained CNNs on the heterogeneous dataset
+
+
+Methods
+
+Classes
+
+Ac (%)
+
+Pr (%)
+
+Re (%)
+
+Fs (%)
+
+Sp (%)
+
+VGG16
+
+ALL
+
+95.92
+
+93.40
+
+94.44
+
+93.92
+
+96.66
+
+AML
+
+96.29
+
+94.44
+
+94.44
+
+94.44
+
+97.22
+
+Healthy
+
+97.77
+
+97.19
+
+96.11
+
+96.64
+
+98.61
+
+VGG19
+
+ALL
+
+96.48
+
+96.00
+
+93.33
+
+94.64
+
+98.05
+
+AML
+
+95.92
+
+92.93
+
+95.00
+
+93.95
+
+96.38
+
+Healthy
+
+97.96
+
+96.68
+
+97.22
+
+96.95
+
+98.33
+
+ResNet50V2
+
+ALL
+
+94.44
+
+91.20
+
+92.22
+
+91.71
+
+95.55
+
+AML
+
+94.25
+
+91.62
+
+91.11
+
+91.36
+
+95.83
+
+Healthy
+
+97.96
+
+97.20
+
+96.66
+
+96.93
+
+98.61
+
+DenseNet121
+
+ALL
+
+92.22
+
+92.07
+
+83.88
+
+87.79
+
+96.38
+
+AML
+
+93.70
+
+86.86
+
+95.55
+
+91.01
+
+92.77
+
+Healthy
+
+97.03
+
+96.06
+
+95.00
+
+95.53
+
+98.05
+
+MobileNet
+
+ALL
+
+93.70
+
+89.67
+
+91.66
+
+90.65
+
+94.72
+
+AML
+
+93.70
+
+91.01
+
+90.00
+
+90.50
+
+95.55
+
+Healthy
+
+97.77
+
+97.19
+
+96.11
+
+96.64
+
+98.61
+
+Xception
+
+ALL
+
+94.25
+
+87.81
+
+96.11
+
+91.77
+
+93.33
+
+AML
+
+96.11
+
+96.49
+
+91.66
+
+94.01
+
+98.33
+
+Healthy
+
+95.55
+
+95.34
+
+91.11
+
+93.18
+
+97.77
+
+InceptionV3
+
+ALL
+
+96.29
+
+93.47
+
+95.55
+
+94.50
+
+96.66
+
+AML
+
+95.18
+
+89.28
+
+97.22
+
+93.08
+
+94.16
+
+Healthy
+
+94.07
+
+96.25
+
+85.55
+
+90.58
+
+98.33
+
+Proposed
+
+ALL
+
+99.44
+
+98.36
+
+100.00
+
+99.17
+
+99.16
+
+AML
+
+100.00
+
+100.00
+
+100.00
+
+100.00
+
+100.00
+
+Healthy
+
+99.44
+
+100.00
+
+98.33
+
+99.15
+
+100.00
+
+A c = accuracy, P r = precision, R e = recall, F s = F1-score, and S p = specificity. Bold values signify optimum performance
+
+To apply statistical analysis to Table 11, the mean values of precision, recall, F1-score, and specificity are considered for each model. However, the accuracy of each model is considered from the calculated values using Eq. ( 8 ). The statistical results corresponding to each performance metric are presented in Table 12. Analyzing Table 12, it is observed that the proposed scheme attained better accuracy (99.44%), precision (99.45%), recall (99.44%), F1-score (99.44%), and specificity (99.72%) in the classification of acute leukemia on the heterogeneous dataset. The proposed scheme outperformed the pre-trained CNNs group, which had mean accuracy (93.33%), mean precision (93.44%), mean recall (93.32%), mean F1-score (93.32%), and mean specificity (96.65%) across the heterogeneous dataset. Furthermore, the P values reported in Table 12 for each performance metric, namely accuracy, precision, recall, F1-score, and specificity, are below 0.05 across the heterogeneous dataset. It signifies that the proposed methodology exhibits statistical significance compared to pretrained CNN models across all performance metrics on the heterogeneous dataset.
+
+Table 12 Comparison of the proposed model and other pretrained CNNs on the heterogeneous dataset
+
+
+Performance metrics
+
+Proposed model
+
+Pretrained CNNs
+
+P value
+
+Accuracy (%)
+
+99.44
+
+93.33
+
+
+Precision (%)
+
+99.45
+
+93.44
+
+
+Recall (%)
+
+99.44
+
+93.32
+
+
+F1-score (%)
+
+99.44
+
+93.32
+
+
+Specificity (%)
+
+99.72
+
+96.65
+
+
+The performance evaluation of a classifier is determined by analyzing the area enclosed by the receiver operating characteristic (ROC) curve of the classifier and the discrete diagonal line. The discrete diagonal line represents a random classifier. The area under the ROC curve (AUC) quantifies the overall performance of a classifier by providing a single numerical measure. The AUC ranges from 0.5 to 1.0, where 0.5 indicates the performance of a random classifier, and 1.0 represents a perfect classifier. Table 13 demonstrates the performance of the proposed scheme and pretrained CNNs in terms of AUC values for both novel and heterogeneous datasets. Notably, the proposed scheme attained the highest AUC values compared to pretrained CNNs on both datasets.
+
+Table 13 Performance of the proposed method and pretrained CNNs in terms of AUC values on both datasets
+
+
+Methods
+
+Classes
+
+AUC on the novel datset
+
+AUC on the heterogeneous dataset
+
+VGG16
+
+ALL
+
+0.95
+
+0.96
+
+AML
+
+0.96
+
+0.96
+
+Healthy
+
+0.97
+
+0.97
+
+VGG19
+
+ALL
+
+0.95
+
+0.96
+
+AML
+
+0.95
+
+0.96
+
+Healthy
+
+0.98
+
+0.98
+
+ResNet50V2
+
+ALL
+
+0.93
+
+0.94
+
+AML
+
+0.93
+
+0.93
+
+Healthy
+
+0.98
+
+0.98
+
+DenseNet121
+
+ALL
+
+0.89
+
+0.90
+
+AML
+
+0.94
+
+0.94
+
+Healthy
+
+0.97
+
+0.97
+
+MobileNet
+
+ALL
+
+0.92
+
+0.93
+
+AML
+
+0.91
+
+0.93
+
+Healthy
+
+0.98
+
+0.97
+
+Xception
+
+ALL
+
+0.97
+
+0.95
+
+AML
+
+0.96
+
+0.95
+
+Healthy
+
+0.90
+
+0.94
+
+InceptionV3
+
+ALL
+
+0.95
+
+0.96
+
+AML
+
+0.94
+
+0.96
+
+Healthy
+
+0.94
+
+0.92
+
+Proposed
+
+ALL
+
+1.00
+
+1.00
+
+AML
+
+1.00
+
+1.00
+
+Healthy
+
+0.99
+
+0.99
+
+Bold values signify the best performance
+
+To apply statistical analysis to Table 13, the mean AUC values are considered for each model by averaging them across three classes for both datasets. The statistical results obtained through the t -test are presented in Table 14. Analyzing Table 14, it is observed that the proposed scheme attained a better AUC value (0.996) in the classification of acute leukemia on both datasets. In addition, it outperformed the pre-trained CNNs group with a mean AUC of 0.945 on the novel dataset and a mean AUC of 0.949 on the heterogeneous dataset. The P values reported in Table 14 for the performance metric AUC are lower than 0.05 on both datasets. It signifies that the proposed scheme exhibits statistical significance compared to other pretrained CNN models in terms of AUC across both datasets.
+
+Table 14 Comparison of the proposed model with various pretrained CNNs on both datasets in terms of AUC
+
+
+Performance metrics
+
+Datasets
+
+Proposed method
+
+Pretrained CNNs
+
+P value
+
+AUC
+
+Novel
+
+0.996
+
+0.945
+
+
+Heterogeneous
+
+0.996
+
+0.949
+
+
+Comparative Analysis
+To evaluate the efficacy of the proposed scheme, the existing various leukemia detection approaches [[ 8 ], [34], [42], [43]–[44]] were applied across both datasets and compared their results. The performance of the proposed methodology and existing leukemia detection methods [8,9,34,35,42 43,44] on the novel dataset is demonstrated in Table 15. The proposed scheme achieved excellent performance compared to existing methodologies [8,9,34,35,42 43,44] in terms of accuracy, precision, recall, F1-score, and specificity across the novel dataset.
+
+Table 15 Performance of the proposed leukemia detection scheme and existing methodologies on the novel dataset
+
+
+Methods
+
+Classes
+
+Ac (%)
+
+Pr (%)
+
+Re (%)
+
+Fs (%)
+
+Sp (%)
+
+Abhishek et al. [8]
+
+ALL
+
+96.25
+
+93.82
+
+95.00
+
+94.40
+
+96.87
+
+AML
+
+96.45
+
+94.96
+
+94.37
+
+94.67
+
+97.50
+
+Healthy
+
+97.70
+
+96.85
+
+96.25
+
+96.55
+
+98.43
+
+Abhishek et al. [9]
+
+ALL
+
+96.87
+
+95.03
+
+95.62
+
+95.32
+
+97.50
+
+AML
+
+96.66
+
+96.15
+
+93.75
+
+94.93
+
+98.12
+
+Healthy
+
+97.29
+
+95.09
+
+96.87
+
+95.97
+
+97.50
+
+Das et al. [34]
+
+ALL
+
+96.87
+
+96.17
+
+94.37
+
+95.26
+
+98.12
+
+AML
+
+96.45
+
+94.40
+
+95.00
+
+94.70
+
+97.18
+
+Healthy
+
+98.33
+
+96.91
+
+98.12
+
+97.51
+
+98.43
+
+Das et al. [35]
+
+ALL
+
+96.66
+
+96.15
+
+93.75
+
+94.93
+
+98.12
+
+AML
+
+96.66
+
+94.44
+
+95.62
+
+95.03
+
+97.18
+
+Healthy
+
+97.91
+
+96.29
+
+97.50
+
+96.89
+
+98.12
+
+Hassan et al. [42]
+
+ALL
+
+97.70
+
+97.45
+
+95.62
+
+96.52
+
+98.75
+
+AML
+
+98.12
+
+96.89
+
+97.50
+
+97.19
+
+98.43
+
+Healthy
+
+97.91
+
+96.29
+
+97.50
+
+96.89
+
+98.12
+
+Chand et al. [43]
+
+ALL
+
+95.83
+
+93.75
+
+93.75
+
+93.75
+
+96.87
+
+AML
+
+96.25
+
+94.37
+
+94.37
+
+94.37
+
+97.18
+
+Healthy
+
+97.08
+
+95.62
+
+95.62
+
+95.62
+
+97.81
+
+Saeed et al. [44]
+
+ALL
+
+96.04
+
+93.25
+
+95.00
+
+94.11
+
+96.56
+
+AML
+
+96.66
+
+95.00
+
+95.00
+
+95.00
+
+97.50
+
+Healthy
+
+97.29
+
+96.81
+
+95.00
+
+95.89
+
+98.43
+
+Proposed
+
+ALL
+
+99.37
+
+98.15
+
+100.00
+
+99.07
+
+99.06
+
+AML
+
+100.00
+
+100.00
+
+100.00
+
+100.00
+
+100.00
+
+Healthy
+
+99.37
+
+100.00
+
+98.12
+
+99.05
+
+100.00
+
+A c = accuracy, P r = precision, R e = recall, F s = F1-score, and S p = specificity. Bold values signify optimum performance
+
+To apply statistical analysis to Table 15, the mean values of precision, recall, F1-score, and specificity are considered for each methodology by taking averages across three classes (ALL, AML, and healthy). However, the accuracy values considered for each methodology were obtained through Eq. ( 8 ). The results obtained through statistical analysis are presented in Table 16. The proposed scheme attained better accuracy (99.37%), precision (99.38%), recall (99.37%), F1-score (99.37%), and specificity (99.68%) across the novel dataset. It outperformed the existing leukemia detection approaches, which had mean accuracy (95.50%), mean precision (95.51%), mean recall (95.50%), mean F1-score (95.49%), and mean specificity (97.74%) across the novel dataset. Moreover, the presented P values of Table 16 are less than 0.05 for all performance metrics, including accuracy, precision, recall, F1-score, and specificity. It establishes the statistical significance of the proposed scheme over existing leukemia detection approaches in terms of all performance metrics on the novel dataset.
+
+Table 16 Comparison of the proposed model with existing approaches on the novel dataset
+
+
+Performance metrics
+
+Proposed model
+
+Existing approaches
+
+P value
+
+Accuracy (%)
+
+99.37
+
+95.50
+
+
+Precision (%)
+
+99.38
+
+95.51
+
+
+Recall (%)
+
+99.37
+
+95.50
+
+
+F1-score (%)
+
+99.37
+
+95.49
+
+
+Specificity (%)
+
+99.68
+
+97.74
+
+
+The performance of the proposed methodology and existing leukemia detection methods [8,9,34,35,42 43,44] on the heterogeneous dataset is demonstrated in Table 17. It has been observed that the proposed methodology obtained superb performances compared to existing methodologies [8,9,34,35,42 43,44] in terms of accuracy, precision, recall, F1-score, and specificity on the heterogeneous dataset.
+
+Table 17 Performance of the proposed leukemia detection scheme and existing methodologies on the heterogeneous dataset
+
+
+Methods
+
+Classes
+
+Ac (%)
+
+Pr (%)
+
+Re (%)
+
+Fs (%)
+
+Sp (%)
+
+Abhishek et al. [8]
+
+ALL
+
+96.66
+
+95.00
+
+95.00
+
+95.00
+
+97.50
+
+AML
+
+96.85
+
+95.02
+
+95.55
+
+95.29
+
+97.50
+
+Healthy
+
+97.22
+
+96.08
+
+95.55
+
+95.82
+
+98.05
+
+Abhishek et al. [9]
+
+ALL
+
+97.03
+
+95.05
+
+96.11
+
+95.58
+
+97.50
+
+AML
+
+96.85
+
+96.04
+
+94.44
+
+95.23
+
+98.05
+
+Healthy
+
+97.22
+
+95.58
+
+96.11
+
+95.84
+
+97.77
+
+Das et al. [34]
+
+ALL
+
+97.40
+
+97.15
+
+95.00
+
+96.06
+
+98.61
+
+AML
+
+97.22
+
+95.08
+
+96.66
+
+95.86
+
+97.50
+
+Healthy
+
+97.96
+
+96.68
+
+97.22
+
+96.95
+
+98.33
+
+Das et al. [35]
+
+ALL
+
+97.03
+
+96.06
+
+95.00
+
+95.53
+
+98.05
+
+AML
+
+96.85
+
+95.02
+
+95.55
+
+95.29
+
+97.50
+
+Healthy
+
+97.96
+
+96.68
+
+97.22
+
+96.95
+
+98.33
+
+Hassan et al. [42]
+
+ALL
+
+98.14
+
+97.22
+
+97.22
+
+97.22
+
+98.61
+
+AML
+
+97.96
+
+96.68
+
+97.22
+
+96.95
+
+98.33
+
+Healthy
+
+98.33
+
+97.76
+
+97.22
+
+97.49
+
+98.88
+
+Chand et al. [43]
+
+ALL
+
+96.48
+
+94.97
+
+94.44
+
+94.70
+
+97.50
+
+AML
+
+96.85
+
+95.02
+
+95.56
+
+95.29
+
+97.50
+
+Healthy
+
+96.29
+
+94.44
+
+94.44
+
+94.44
+
+97.22
+
+Saeed et al. [44]
+
+ALL
+
+96.85
+
+94.53
+
+96.11
+
+95.31
+
+97.22
+
+AML
+
+96.85
+
+96.04
+
+94.44
+
+95.23
+
+98.05
+
+Healthy
+
+97.03
+
+95.55
+
+95.55
+
+95.55
+
+97.77
+
+Proposed
+
+ALL
+
+99.44
+
+98.36
+
+100.00
+
+99.17
+
+99.16
+
+AML
+
+100.00
+
+100.00
+
+100.00
+
+100.00
+
+100.00
+
+Healthy
+
+99.44
+
+100.00
+
+98.33
+
+99.15
+
+100.00
+
+A c , P r , R e , F s , and S p denote accuracy, precision, recall, F1-score, and specificity. Bold values signify optimum performance
+
+To apply statistical analysis to Table 17, the mean values of precision, recall, F1-score, and specificity are considered for each methodology by averaging them across three classes (ALL, AML, and healthy). However, the accuracy values considered for each methodology were obtained using Eq. ( 8 ). The statistical results obtained through the t -test are presented in Table 18. It is observed that the proposed scheme attained better accuracy (99.44%), precision (99.45%), recall (99.44%), F1-score (99.44%), and specificity (99.72%) in the classification of acute leukemia on the heterogeneous dataset. In addition, it outperformed the existing leukemia detection approaches with mean accuracy (95.79%), mean precision (95.79%), mean recall (95.78%), mean F1-score (95.78%), and mean specificity (97.89%) on the heterogeneous dataset. The reported P values of Table 18 are less than 0.05 for all performance metrics, including accuracy, precision, recall, F1-score, and specificity. This suggests that the proposed method is statistically significant compared to existing leukemia detection approaches in terms of all performance metrics across the heterogeneous dataset.
+
+Table 18 Comparison of the proposed model with existing approaches on the heterogeneous dataset
+
+
+Performance metrics
+
+Proposed model
+
+Existing approaches
+
+P value
+
+Accuracy (%)
+
+99.44
+
+95.79
+
+
+Precision (%)
+
+99.45
+
+95.79
+
+
+Recall (%)
+
+99.44
+
+95.78
+
+
+F1-score (%)
+
+99.44
+
+95.78
+
+
+Specificity (%)
+
+99.72
+
+97.89
+
+
+The performance of the proposed scheme and existing leukemia detection approaches [8,9,34,35,42 43,44] in terms of AUC values are demonstrated in Table 19 for both novel and heterogeneous datasets. According to Table 19, the proposed scheme achieved better AUC values compared to existing methodologies across both datasets. For statistical analysis in Table 19, the mean AUC values are considered for each method by averaging the AUC values across three classes for both datasets. The statistical results are demonstrated in Table 20. Notably, the proposed scheme attained a better AUC value (0.996) in the classification of acute leukemia across both datasets.
+
+Table 19 Performance of the proposed method and existing approaches in terms of AUC values on both datasets
+
+
+Methods
+
+Classes
+
+AUC on the novel dataset
+
+AUC on the heterogeneous dataset
+
+Abhishek et al. [8]
+
+ALL
+
+0.96
+
+0.96
+
+AML
+
+0.96
+
+0.97
+
+Healthy
+
+0.97
+
+0.97
+
+Abhishek et al. [9]
+
+ALL
+
+0.97
+
+0.97
+
+AML
+
+0.96
+
+0.96
+
+Healthy
+
+0.97
+
+0.97
+
+Das et al. [34]
+
+ALL
+
+0.96
+
+0.97
+
+AML
+
+0.96
+
+0.97
+
+Healthy
+
+0.98
+
+0.98
+
+Das et al. [35]
+
+ALL
+
+0.96
+
+0.97
+
+AML
+
+0.96
+
+0.97
+
+Healthy
+
+0.98
+
+0.98
+
+Hassan et al. [42]
+
+ALL
+
+0.95
+
+0.98
+
+AML
+
+0.96
+
+0.98
+
+Healthy
+
+0.97
+
+0.98
+
+Chand et al. [43]
+
+ALL
+
+0.96
+
+0.96
+
+AML
+
+0.96
+
+0.97
+
+Healthy
+
+0.97
+
+0.96
+
+Saeed et al. [44]
+
+ALL
+
+0.97
+
+0.97
+
+AML
+
+0.98
+
+0.96
+
+Healthy
+
+0.98
+
+0.97
+
+Proposed
+
+ALL
+
+1.00
+
+1.00
+
+AML
+
+1.00
+
+1.00
+
+Healthy
+
+0.99
+
+0.99
+
+Bold values signify the best performance
+
+Table 20 Comparison of the proposed model and other existing approaches on both datasets in terms of AUC
+
+
+Performance metrics
+
+Datasets
+
+Proposed method
+
+Other existing approaches
+
+P value
+
+AUC
+
+Novel
+
+0.996
+
+0.965
+
+
+Heterogeneous
+
+0.996
+
+0.969
+
+
+In addition, it outperformed the other existing leukemia detection approaches with a mean AUC of 0.965 on the novel dataset and a mean AUC of 0.969 on the heterogeneous dataset. Moreover, according to Table 20, the P values for AUC are lower than 0.05 across both datasets. This signifies that the proposed methodology is statistically significant compared to existing leukemia detection approaches in terms of AUC across both datasets.
+
+Performance of Various ML Algorithms
+As per the literature [[ 8 ], [13], [21], [23], [27]], we have selected ML-based various texture and color features to investigate their performance on both datasets. The texture features such as the GLRLM, GLCM, rotation invariant LBP with a uniform pattern, and HOG are considered. The color features like mean intensity values of the RGB color model (Mean RGB), mean intensity values of the CMYK color model (Mean CMYK), and mean intensity values of the HSV color model (Mean HSV) are considered. In the post-operation of feature computation, the most significant features are selected using the ANOVA test, and features are organized in descending order of F -values. In addition, the covariance structure of ANOVA-test reorganized features are removed using the zero phase component analysis (ZCA) whitening strategy. Finally, the classification is done using various ML-based classifiers like K-NN, multi-class SVM, NB, RF, ANN, and linear discriminant analysis (LDA). The performance of these ML algorithms on both novel and heterogeneous datasets is demonstrated in Table 21.
+
+Table 21 Performance of various ML algorithms on novel and heterogeneous datasets in terms of accuracy
+
+
+Features
+
+Feature selection
+
+Classifier
+
+Accuracy (%) on the novel dataset
+
+Accuracy (%) on the heterogeneous dataset
+
+GLRLM + Mean RGB + Mean HSV + Mean CMYK
+
+ANOVA Test + ZCA whitening
+
+K-NN
+
+SVM
+
+NB
+
+RF
+
+ANN
+
+LDA
+
+81.45
+
+85.00
+
+67.91
+
+81.25
+
+83.95
+
+81.04
+
+81.48
+
+85.37
+
+68.33
+
+81.66
+
+84.07
+
+81.29
+
+Rotation invariant LBP with a uniform pattern + Mean RGB + Mean HSV + Mean CMYK
+
+ANOVA Test + ZCA whitening
+
+K-NN
+
+SVM
+
+NB
+
+RF
+
+ANN
+
+LDA
+
+79.58
+
+84.37
+
+67.91
+
+79.37
+
+83.33
+
+77.50
+
+80.37
+
+84.81
+
+67.96
+
+79.81
+
+83.51
+
+77.77
+
+GLCM + Mean RGB + Mean HSV + Mean CMYK
+
+ANOVA Test + ZCA whitening
+
+K-NN
+
+SVM
+
+NB
+
+RF
+
+ANN
+
+LDA
+
+72.29
+
+79.58
+
+62.08
+
+71.25
+
+78.75
+
+67.91
+
+72.40
+
+80.18
+
+62.22
+
+71.48
+
+78.88
+
+68.14
+
+HOG + Mean RGB + Mean HSV
+
++ Mean CMYK
+
+ANOVA Test + ZCA whitening
+
+K-NN
+
+SVM
+
+NB
+
+RF
+
+ANN
+
+LDA
+
+60.00
+
+69.58
+
+56.25
+
+64.79
+
+68.12
+
+64.16
+
+60.18
+
+69.81
+
+56.48
+
+65.00
+
+68.14
+
+64.44
+
+Bold values signify optimum performances
+
+Analyzing Table 21, it has been observed that the most successful ML approach for our datasets is GLRLM + color features with an SVM classifier. It provides a maximum accuracy of 85% on the novel dataset and 85.37% on the heterogeneous dataset. However, in the field of medical engineering, attaining an accuracy rate of around 85% for life-threatening conditions such as leukemia is considered very moderate. In recent advancements in leukemia detection schemes, it has been observed that DL-based approaches [[35], [37], [39], [45]] achieved promising results in small public datasets like ALL-IDB1 [[14]] comprising108 images, ALL-IDB2 [[14]] comprising 260 images, and the ASH datasets [[18]] obtaining below 200 images. In the literature, there are some recent studies available that utilize below 1300 smear images for leukemia detection [[ 8 ]]. In work [[ 8 ]], the author privately collected 500 smear images from hospitals for a 3-class classification of leukemia. In their subsequent work [[ 9 ]], the authors expanded their dataset by including 750 more images, which resulted in 1250 images. In addition, DL approaches solely depend on automated feature engineering, unlike ML-based approaches that rely on handcrafted features. It is also observed that selecting the most suitable features for specific datasets in an ML-based leukemia detection scheme is challenging. Further, it has been observed significant differences in performance among ML-based classifiers utilizing the same features. Thus, selecting the most suitable classifier is also challenging in ML-based approaches.
+
+The low performance of ML-based approaches on our datasets, whereas the promising results of DL-based approaches on small datasets such as ALL-IDB1 [[14]], ALL-IDB2 [[14]], and ASH [[18]], motivated us to adopt a DL-based methodology for this study. One of the major challenges of DL-based approaches is an overfitting issue. This study proposes a combined strategy of the BFMD with SN layers to handle overfitting issues. The proposed BSNEU-net framework is a lightweight architecture comprising 1.75 M parameters specifically designed based on our dataset size. This framework is even lighter than the lightest pretrained CNN MobileNetV2 [[36]], which has 3.5 M parameters. In addition, we applied various data augmentation techniques, including rotation, horizontal and vertical flipping, height and width shifting, shearing, and zooming during the training stage. Moreover, the learning rate was decreased linearly to reduce the overfitting further.
+
+Performance Analysis of the Proposed Scheme across Benchmarked Datasets
+The proposed methodology is evaluated on four publicly accessible benchmarked datasets to evaluate its efficacy across various datasets. The ALL-IDB1 [[14]] and ALL-IDB2 [[14]] datasets are utilized for the classification of ALL and healthy cases, whereas the ASH image bank [[18]] and AML-Cytomorphology_LMU [[48]] datasets are utilized for the classification of AML and healthy cases. The ALL-IDB1 dataset contains 108 images (49 ALL and 59 healthy), and the ALL-IDB2 dataset contains 260 images (130 ALL and 130 healthy). We have collected 118 images (59 AML and 59 healthy) from the ASH image bank and 6536 single-cell images (3268 AML and 3268 healthy) from the AML-Cytomorphology_LMU [[48]] dataset for AML detection. The performance of the proposed methodology on these datasets is demonstrated in Table 22.
+
+Table 22 Performance of the proposed methodology on publicly accessible benchmarked datasets
+
+
+Datasets
+
+Ac (%)
+
+Pr (%)
+
+Re (%)
+
+Fs (%)
+
+Sp (%)
+
+AUC
+
+ALL-IDB1 [14]
+
+99.07
+
+100
+
+98.31
+
+99.15
+
+100
+
+0.991
+
+ALL-IDB2 [14]
+
+99.23
+
+99.23
+
+99.23
+
+99.23
+
+99.23
+
+0.992
+
+ASH Image Bank [18]
+
+99.15
+
+98.33
+
+100
+
+99.16
+
+98.31
+
+0.991
+
+AML_
+
+Cytomorphology_LMU [48]
+
+99.01
+
+99.08
+
+98.93
+
+99.01
+
+99.08
+
+0.990
+
+A c = accuracy, P r = precision, R e = recall, F s = F1-score, and S p = specificity
+
+Analyzing Table 22, the proposed methodology demonstrated exceptional performance across all benchmark datasets. The highest accuracy for ALL detection was achieved on the ALL-IDB2 [[14]] dataset with 99.23%, whereas the ASH [[18]] dataset obtained the highest accuracy of 99.15% for AML detection. These results validate the robustness and effectiveness of our proposed methodology across different types of datasets, including both novel and heterogeneous data, as well as well-established benchmarked datasets. The accuracy and loss curves for the proposed BSNEU-net, corresponding to ALL-IDB1 [[14]], ALL-IDB2 [[14]], ASH [[18]], and AML_Cytomorphology_LMU [[48]] datasets, are presented in Figs. 10, 11, 12, and 13, respectively. From Figs. 10, 11, 12, and 13, it is observed that the validation curves converge close to the training curves and do not deviate from the training curves. Further, the loss curves signify that the proposed methodology exhibits no instance of overfitting during training across the ALL-IDB1 [[14]], ALL-IDB2 [[14]], ASH [[18]], and AML_Cytomorphology_LMU [[48]] datasets.
+
+Graph: Fig. 10 (a) Accuracy and (b) loss curves during training and validation over the ALL-IDB1 [[14]] dataset by employing the proposed BSNEU-net
+
+Graph: Fig. 11 (a) Accuracy and (b) loss curves during training and validation over the ALL-IDB2 [[14]] dataset by employing the proposed BSNEU-net
+
+Graph: Fig. 12 (a) Accuracy and (b) loss curves during training and validation over the ASH [[18]] dataset by employing the proposed BSNEU-net
+
+Graph: Fig. 13 (a) Accuracy and (b) loss curves during training and validation over AML_Cytomorphology_LMU [[48]] dataset by employing the proposed BSNEU-net
+
+Discussion
+The experimental results and comparative studies signify that the proposed scheme outperformed pre-trained CNNs, specifically VGG16, VGG19, ResNet50V2, DenseNet121, MobileNet, Xception, and InceptionV3 on both datasets. In addition, the proposed methodology outperformed the various existing leukemia detection approaches across both novel and heterogeneous datasets. Further, the statistical analysis also establishes the efficacy of the proposed methodology in terms of accuracy, precision, recall, F1-score, specificity, and AUC over pretrained CNNs and existing leukemia detection methodologies across both datasets. This success can be attributed to the proposed BSNEU-net framework incorporating the BFMD and SN-layer after each convolution layer. The regularization strategy BFMD enhances the generalization capacity of the proposed model by adding distortions to the feature maps. Further, it aids in minimizing overfitting in the model by mitigating its reliance on particular properties of the training data, hence facilitating the acquisition of more generalized patterns. On the other hand, the SN layer provides the flexibility to employ several normalizations that make it more robust against minibatch dimension changes. Thus, the SN layer aids the BFMD block further to enhance the model's convergence and generalization performance. Moreover, the enhanced Union-net configuration computed unified features from 4 Union Blocks following the union convolution principle.
+
+The various ML-based strategies experimented on both novel and heterogeneous datasets. The experimental results presented in Table 21 reveal that the maximum accuracy obtained through ML-based approaches is 85% on the novel dataset and 85.37% on the heterogeneous datasets. However, in the field of medical image analysis, obtaining an accuracy rate of around 85% for life-threatening diseases like leukemia is considered very moderate. Thus, we aim to develop a robust computer-assisted automated system with enhanced accuracy to assist hematologists in the rapid diagnosis of leukemia. As mentioned earlier, the recent advancements in DL methodologies encourage us to choose a DL-based methodology for this study. Our proposed DL-based BSNEU-net framework achieved excellent performance with 99.37% accuracy on the novel dataset and 99.44% accuracy on the heterogeneous dataset. The outstanding performance of the BSNEU-net framework across both datasets significantly surpasses the traditional ML-based strategies.
+
+The evaluation of the proposed scheme is not limited to novel and heterogeneous datasets. The proposed scheme is evaluated on four publicly accessible benchmarked datasets, including ALL-IDB1 [[14]], ALL-IDB2 [[14]], ASH image bank [[18]], and AML_Cytomorphology_LMU [[48]], to evaluate its efficacy across various diverse datasets. The proposed methodology demonstrated exceptional performance across all benchmarked datasets. The highest accuracy for ALL detection was achieved on the ALL-IDB2 [[14]] dataset with 99.23%, whereas the ASH dataset had the highest accuracy of 99.15% for AML detection.
+
+The performance of the proposed work to other similar efforts using the parameters accessible in the published literature is demonstrated in Table 23. Analyzing Table 23, it is observed that the proposed BFMD + SN-based BSNEU-net framework outperforms all other approaches with an accuracy of 99.37% on the novel dataset and 99.44% on the heterogeneous dataset. The proposed method shows high values of accuracy (99.37% and 99.44%), recall (99.37% and 99.44%), specificity (99.68% and 99.72), and precision (99.38% and 99.45%) across both novel and heterogeneous datasets compared to existing similar works. In addition, the proposed methodology dealt with more smear images than other methods.
+
+Table 23 Comparison of the proposed acute leukemia detection scheme with similar existing leukemia detection methods in terms of accuracy, recall, specificity, and precision
+
+
+Approaches and year
+
+Used classifier
+
+Used dataset
+
+Ac (%)
+
+Re (%)
+
+Sp (%)
+
+Pr (%)
+
+Saikia et al. [13] (2024)
+
+WOA-SVM
+
+ALL-IDB1
+
+98.42
+
+NC
+
+NC
+
+NC
+
+Mohapatra et al. [16] (2014)
+
+Ensemble classifier
+
+A private dataset comprising 108 images
+
+94.73
+
+94.93
+
+95.00
+
+NC
+
+Putuzu et al. [19] (2014)
+
+SVM
+
+A private dataset comprising 267 images
+
+93.63
+
+98.00
+
+NC
+
+NC
+
+Neoh et al. [20] (2015)
+
+SVM
+
+ALL-IDB2
+
+96.72
+
+NC
+
+NC
+
+NC
+
+Moshavash et al. [23] (2018)
+
+SVM
+
+ASH
+
+98.10
+
+97.57
+
+98.09
+
+98.17
+
+Augustin et al. [27] (2021)
+
+Multiclass NN-BP
+
+Multiclass NN-PSO
+
+5 peripheral smears from the hospital (Private)
+
+86.92
+
+NC
+
+NC
+
+NC
+
+Das et al. [40] (2024)
+
+SBCDNet
+
+ALL-IDB1
+
+ASH
+
+98.15
+
+97.50
+
+97.96
+
+97.50
+
+98.31
+
+97.50
+
+97.96
+
+97.50
+
+Rodrigues et al. [41] (2022)
+
+GA with ResNet-50V2
+
+ALL-IDB
+
+98.46
+
+98.46
+
+NC
+
+98.55
+
+Abhishek et al. [8] (2022)
+
+ResNet50 + SVM
+
+Fine-Tune VGG16
+
+DenseNet121 + SVM
+
+500 images (3-class)
+
+608 images (Binary)
+
+608 images (Binary)
+
+95.00
+
+97.00
+
+98
+
+NC
+
+95.00
+
+NC
+
+NC
+
+90.00
+
+NC
+
+NC
+
+90.00
+
+NC
+
+Abhishek et al. [9] (2023)
+
+Pruned VGG16 + Fined-Tunning
+
+1250 smear images from a private dataset
+
+84
+
+83.60
+
+95.80
+
+83.60
+
+Anilkumar et al. [45] (2022)
+
+CNN
+
+ASH
+
+94.12
+
+94.12
+
+94.12
+
+NC
+
+Dhalla et al. [46] (2024)
+
+CNN
+
+ALL-IDB1
+
+ALL-IDB2 C_NMC_2019
+
+98.89
+
+98.46
+
+94.98
+
+98.01
+
+97.56
+
+94.88
+
+98.89
+
+97.16
+
+94.88
+
+98.43
+
+98.06
+
+93.88
+
+Proposed
+
+BFMD + SN-based BSNEU-net
+
+Novel dataset (2400 images)
+
+Heterogeneous Dataset (2700 images)
+
+99.37
+
+99.44
+
+99.37
+
+99.44
+
+99.68
+
+99.72
+
+99.38
+
+99.45
+
+A c = accuracy, R e = recall, S p = specificity, P r = precision, NC= not computed. Bold values signify the optimum performances
+
+However, the present study is constrained by specific limitations. The study primarily addresses the detection of acute leukemia, explicitly focusing on ALL and AML. This study does not consider other types of leukemia, such as chronic leukemia. The study introduced a sizeable novel dataset consisting of 2400 images. However, further expansion to include more images would likely improve the robustness and generalization capability of the model. In addition, this study proposes a novel strategy by combining the BFMD with SN layers to mitigate the overfitting issue. Despite these measures, the potential for overfitting in DL-based approaches cannot be completely eliminated.
+
+Conclusion
+This paper proposed a novel BSNEU-net framework for detecting ALL, AML, and healthy cases that was validated on novel and heterogeneous datasets. The BSNEU-net framework combines 4 Union Blocks and incorporates the BFMD with SN layers in each Union Block. The Union Block adapts a union convolution strategy that extracts more prominent features. The BFMD layer enhances the model's generalization capacity by adding distortions to the feature maps. It aids in minimizing overfitting in the model by mitigating its reliance on particular properties of the training data, hence facilitating the acquisition of more generalized patterns. Further, the SN layer is appended to provide flexibility in employing several normalizations that make it more robust against minibatch dimension changes. Thus, the SN assists the BFMD layer further, enhancing the model's convergence and generalization performance. Finally, a SoftMax layer is employed for the 3-class classification of ALL, AML, and healthy images. The performance of the proposed scheme is evaluated quantitatively using performance metrics: accuracy, precision, recall, F1 score, specificity, and AUC. The experimental outcomes established that the proposed methodology achieved excellent performance with an overall 99.37% accuracy on the novel dataset and 99.44% accuracy on the heterogeneous dataset. The comparative analysis reveals that the proposed scheme outperformed pre-trained CNNs, namely, VGG16, VGG19, ResNet50V2, DenseNet121, MobileNet, Xception, and InceptionV3 on both datasets with the aspect of each performance metric. In addition, the comparative studies underscore that the proposed methodology significantly enhanced precision, recall, F1 score, specificity, and AUC compared to the existing methodologies on both datasets. Furthermore, the proposed methodology achieved excellent performance in publicly accessible benchmarked datasets of ALL, AML, and healthy cases. The promising outcomes suggest that the proposed methodology may be employed as an acute leukemia diagnostic tool that definitely assists hematologists in the early diagnosis of ALL and AML. In the future, the proposed methodology may be extended to a 5-class classification model, including the classification of CLL and CML cases. Further, another research scope can be taken into consideration where the proposed scheme may be extended towards the sub-classification of ALL, i.e., B-lineage ALL and T-lineage ALL, which WHO recommends.
+
+Acknowledgements
+The authors would like to thank Dr. Bhubaneswar Borooah Cancer Institute, Guwahati, India, for their valuable support during the collection of dataset comprises microscopic blood smear images and also the detection of ALL, under the Institutional Ethics Committee (IEC) No. "Ref. No. BBCI-TMC/Misc-01/MEC/125/2022".
+
+Author Contribution
+Rabul Saikia: experimentation, methodology, writing of original draft. Roopam Deka: data collection, evaluation. Anupam Sarma: data collection, evaluation. Salam Shuleenda Devi: supervision, visualization, investigation.
+
+Data Availability
+Dataset utilized for the proposed study is a private dataset collected in collaboration with Dr. Bhubaneswar Borooah Cancer Institute, Guwahati, India, with prior approval of the Institutional Ethics Committee (Ref. No. BBCI-TMC/Misc-01/MEC/125/2022). Access to this sensitive data is restricted to ensure the confidentiality and privacy of the individuals involved.
+
+Declarations
+Ethics Approval
+This study utilizes a dataset collected in collaboration with Dr. Bhubaneswar Borooah Cancer Institute, Guwahati, India, with prior approval of the Institutional Ethics Committee (Ref. No. BBCI-TMC/Misc-01/MEC/125/2022).
+
+Conflict of Interest
+The authors declare no competing interests.
+
+Publisher's Note
+Springer Nature remains neutral with regard to jurisdictional claims in published maps and institutional affiliations.
+
+References
+1 Cancer Research UK. Available at https:// www.cancerresearchuk.org . Accessed on 02 April 2024
+
+2 Mayo Clinic, Rochester. Available at https:// www.mayoclinic.org . Accessed on 08 December 2023
+
+3 Pefani E, Panoskaltsis N, Mantalaris A, Georgiadis MC, Pistikopoulos EN. Chemotherapy drug scheduling for the induction treatment of patients with acute myeloid leukemia. IEEE Trans Biomed Eng. 2014; 61; 7: 2049-2056. 1:STN:280:DC%2BC2crptVaruw%3D%3D. 10.1109/TBME.2014.2313226. 24686224
+
+4 Vogado LH, Veras RM, Araujo FH, Silva RR, Aires KR. Leukemia diagnosis in blood slides using transfer learning in CNNs and SVM for classification. Eng Appl Artif Intell. 2018; 72: 415-422. 10.1016/j.engappai.2018.04.024
+
+5 The Global Cancer Observatory. Available at https://gco.iarc.fr/today/data/factsheets/cancers/36-Leukemia-factsheet.pdf. Accessed on 07 November 2023
+
+6 Dacie JV, Lewis SM: Practical Haematology. 8th edition, Edinburgh: Churchil Livingstone, 1995.
+
+7 Sadler JE: What's new in the diagnosis and pathophysiology of thrombotic thrombocytopenic purpura. Hematology 2014, the American Society of Hematology Education Program Book 2015(1):631–63, 2015. https://doi.org/10.1182/asheducation-2015.1.631
+
+8 Abhishek A, Jha RK, Sinha R, Jha K. Automated classification of acute leukemia on a heterogeneous dataset using machine learning and deep learning techniques. Biomed Signal Process Control. 2022; 72. 10.1016/j.bspc.2021.103341103341
+
+9 Abhishek A, Jha RK, Sinha R, Jha K. Automated detection and classification of leukemia on a subject-independent test dataset using deep transfer learning supported by Grad-CAM visualization. Biomed Signal Process Control. 2023; 83: 104722. 10.1016/j.bspc.2023.104722
+
+Gokulkannan K, Mohanaprakash TA, DafniRose J, Sriman B. Multiscale adaptive and attention-dilated convolutional neural network for efficient leukemia detection model with multiscale trans-res-Unet3+-based segmentation network. Biomed Signal Process Control. 2024; 90: 105847. 10.1016/j.bspc.2023.105847
+
+Scotti F: Automatic morphological analysis for acute leukemia identification in peripheral blood microscope images. CIMSA 2005 IEEE International Conference on Computational Intelligence for Measurement Systems and Applications, 2005. https://doi.org/10.1109/CIMSA.2005.1522835
+
+Negm AS, Hassan OA, Kandil AH. A decision support system for Acute Leukaemia classification based on digital microscopic images. Alex Eng J. 2018; 57; 4: 2319-2332. 10.1016/j.aej.2017.08.025
+
+Saikia R, Sarma A, Devi SS. Optimized Support Vector Machine Using Whale Optimization Algorithm for Acute Lymphoblastic Leukemia Detection from Microscopic Blood Smear Images. SN Comput Sci. 2024; 5: 439. 10.1007/s42979-024-02822-4
+
+Labati RD, Piuri V, Scotti F: All-IDB: The acute lymphoblastic leukemia image database for image processing. 2011 18th IEEE International Conference on Image Processing, 2011. https://doi.org/10.1109/ICIP.2011.6115881
+
+Mohapatra S, Samanta SS, Patra D, Satpathi S: Fuzzy Based Blood Image Segmentation for Automated Leukemia Detection. 2011 IEEE International Conference on Devices and Communications (ICDeCom), 2011. https://doi.org/10.1109/ICDECOM.2011.5738491
+
+Mohapatra S, Patra D, Satpathy S. An ensemble classifier system for early diagnosis of acute lymphoblastic leukemia in blood microscopic images. Neural Comput Appl. 2014; 24: 1887-1904. 10.1007/s00521-013-1438-3
+
+Agaian S, Madhukar M, Chronopoulos AT. Automated screening system for acute myelogenous leukemia detection in blood microscopic images. IEEE Syst J. 2014; 8; 3: 995-1004. 10.1109/JSYST.2014.2308452
+
+American Society of Hematology, ASH Image Bank. Available at https://imagebank.hematology.org Accessed on 17 January 2024
+
+Putzu L, Caocci G, Di Ruberto C. Leucocyte classification for leukaemia detection using image processing techniques. Artif Intell Med. 2014; 62; 3: 179-191. 10.1016/j.artmed.2014.09.002. 25241903
+
+Chin Neoh S, Srisukkham W, Zhang L, Todryk S, Greystoke B, Peng Lim C, Alamgir Hossain M, Aslam N. An Intelligent Decision Support System for Leukaemia Diagnosis using Microscopic Blood Images. Sci Rep. 2015; 5: 14938. 1:CAS:528:DC%2BC2MXhs1Kks73I. 10.1038/srep14938. 26450665. 4598743
+
+Das PK, Jadoun P, Meher S: Detection and classification of acute lymphocytic leukemia. 2020 IEEE-HYDCON, 2020. https://doi.org/10.1109/HYDCON48903.2020.9242745
+
+Rawat J, Singh A, Bhadauria HS, Virmani J, Devgun JS. Computer assisted classification framework for prediction of acute lymphoblastic and acute myeloblastic leukemia. Biocybern Biomed Eng. 2017; 37; 4: 637-654. 10.1016/j.bbe.2017.07.003
+
+Moshavash Z, Danyali H, Helfroush MS. An automatic and robust decision support system for accurate acute leukemia diagnosis from blood microscopic images. J Digit Imaging. 2018; 31; 5: 702-717. 10.1007/s10278-018-0074-y. 29654425. 6148816
+
+Mishra S, Majhi B, Sa PK: Glrlm-based feature extraction for acute lymphoblastic leukemia (all) detection. Recent Findings in Intelligent Computing Techniques: Proceedings of the 5th ICACNI Volume 2, 2018. https://doi.org/10.1007/978-981-10-8636-6_41
+
+Hegde RB, Prasad K, Hebbar H, Singh BMK, Sandhya I. Automated decision support system for detection of leukemia from peripheral blood smear images. J Digit Imaging. 2020; 33: 361-374. 10.1007/s10278-019-00288-y. 31728805
+
+Agaian S, Madhukar M, Chronopoulos AT. A new acute leukaemia-automated classification system. Computer Methods in Biomechanics and Biomedical Engineering: Imaging & Visualization. 2018; 6; 3: 303-314. 10.1080/21681163.2016.1234948
+
+Agustin RI, Arif A, Sukorini U. Classification of immature white blood cells in acute lymphoblastic leukemia L1 using neural networks particle swarm optimization. Neural Comput Appl. 2021; 33: 10869-10880. 10.1007/s00521-021-06245-7
+
+Das PK, Meher S, Panda R, Abraham A. An Efficient Blood-Cell Segmentation for the Detection of Hematological Disorders. IEEE Trans Cybern. 2022; 52; 10: 10615-10626. 10.1109/TCYB.2021.3062152. 33735090
+
+Das PK, Meher S. AWOLSE: Adaptive Weight-Optimized Level Set Evolution-Based Blood Cell Segmentation. IEEE Trans Instrum Meas. 2024; 73: 1-12. 10.1109/TIM.2023.3331410
+
+Ibrahim AU, Dirilenoğlu F, Hacisalihoğlu UP, Ilhan A, Mirzaei O: Classification of H. pylori Infection from Histopathological Images Using Deep Learning. J Digit Imaging Inform med 37:1177–1186, 2024. https://doi.org/10.1007/s10278-024-01021-0
+
+Das PK, Sreevatsav S, Abraham A. An efficient deep learning network with orthogonal softmax layer for automatic detection of tuberculosis. Eng Appl Artif Intell. 2024; 133: 108116. 10.1016/j.engappai.2024.108116
+
+Kumar D, Jain N, Khurana A, Mittal S, Satapathy SC, Senkerik R, Hemanth JD. Automatic detection of white blood cancer from bone marrow microscopic images using convolutional neural networks. IEEE Access. 2020; 8: 142521-142531. 10.1109/ACCESS.2020.3012292
+
+Karar ME, Alotaibi B, Alotaibi M. Intelligent medical IoT-enabled automated microscopic image diagnosis of acute blood cancers. Sensors. 2022; 22; 6: 2348. 10.3390/s22062348. 35336523. 8949784
+
+Das PK, Meher S: Transfer learning-based automatic detection of acute lymphocytic leukemia. 2021 National Conference on Communications (NCC), 2021. https://doi.org/10.1109/NCC52529.2021.9530010
+
+Das PK, Nayak B, Meher S. A lightweight deep learning system for automatic detection of blood cancer. Measurement. 2022; 191: 110762. 10.1016/j.measurement.2022.110762
+
+Sandler M, Howard A, Zhu M, Zhmoginov A, Chen LC: Mobilenetv2: Inverted residuals and linear bottlenecks. Proceedings of the IEEE conference on computer vision and pattern recognition, 2018.
+
+Das PK, Sahoo B, Meher S. An Efficient Detection and Classification of Acute Leukemia Using Transfer Learning and Orthogonal Softmax Layer-Based Model. IEEE/ACM Transactions on Computational Biology and Bioinformatics. 2023; 20; 3: 1817-1828. 1:CAS:528:DC%2BB3sXhvVekurfM. 10.1109/TCBB.2022.3218590. 36318567
+
+Gupta A, Gupta R: ISBI 2019 C-NMC challenge: classification in cancer cell imaging. Select Proceedings 2, 2019https://doi.org/10.1007/978-981-15-0798-4
+
+Das PK, Meher S. An efficient deep convolutional neural network based detection and classification of acute lymphoblastic leukemia. Expert Syst Appl. 2021; 183: 115311. 10.1016/j.eswa.2021.115311
+
+Das PK, Sahu A, Diya VA, Meher S. SBCDNet: An Efficient Sparse-Based Deep Cascade Blood Cancer Detection Network. IEEE Sens Lett. 2024; 8; 1: 1-4. 10.1109/LSENS.2023.3345535
+
+Rodrigues LF, Backes AR, Travençolo BAN, De Oliveira GMB. Optimizing a deep residual neural network with genetic algorithm for acute lymphoblastic leukemia classification. J Digit Imaging Inform med. 2022; 35; 3: 623-637. 10.1007/s10278-022-00600-3
+
+Hassan E, Saber A, Elbedwehy S. Knowledge distillation model for Acute Lymphoblastic Leukemia Detection: Exploring the impact of nesterov-accelerated adaptive moment estimation optimizer. Biomed Signal Process Control. 2024; 94: 106246. 10.1016/j.bspc.2024.106246
+
+Chand S, Vishwakarma VP. A novel deep learning framework (DLF) for classification of acute lymphoblastic leukemia. Multimed Tools Appl. 2022; 81: 37243-37262. 10.1007/s11042-022-13543-2
+
+Saeed U, Kumar K, Khuhro MA, Laghari AA, Shaikh AA, Rai A: DeepLeukNet—A CNN based microscopy adaptation model for acute lymphoblastic leukemia classification. Multimed Tools Appl 1–25, 2023. https://doi.org/10.1007/s11042-023-16191-2
+
+Anilkumar KK, Manoj VJ, Sagi TM. Automated detection of b cell and t cell acute lymphoblastic leukaemia using deep learning. Irbm. 2022; 43; 5: 405-413. 10.1016/j.irbm.2021.05.005
+
+Dhalla S, Mittal A, Gupta S. LeukoCapsNet: a resource-efficient modified CapsNet model to identify leukemia from blood smear images. Neural Comput Appl. 2024; 36: 2507-2524. 10.1007/s00521-023-09157-w
+
+Kaggle, Blood Cells Cancer (ALL) dataset. Available at https:// www.kaggle.com/datasets/mohammadamireshraghi/blood-cell-cancer-all-4class Accessed on 03 August 2024
+
+Matek C, Schwarz S, Spiekermann K, Marr C. Human-level recognition of blast cells in acute myeloid leukaemia with convolutional neural networks. Nat Mach Intell. 2019; 1: 538-544. 10.1038/s42256-019-0101-9
+
+Simonyan K, Zisserman A: Very deep convolutional networks for large-scale image recognition. arXiv preprint arXiv:1409.1556, 2014.
+
+Rahimzadeh M, Attar A. A modified deep convolutional neural network for detecting COVID-19 and pneumonia from chest X-ray images based on the concatenation of Xception and ResNet50V2. Inform Med Unlocked. 2020; 19: 100360. 10.1016/j.imu.2020.100360. 32501424. 7255267
+
+Huang G, Liu Z, Maaten LVD, Weinberger KQ: Densely connected convolutional networks. Proceedings of the IEEE conference on computer vision and pattern recognition, 2017. https://doi.org/10.48550/arXiv.1608.06993
+
+Howard AG, Zhu M, Chen B, Kalenichenko D, Wang W, Weyand T, Andreetto M, Adam H: Mobilenets: Efficient convolutional neural networks for mobile vision applications. arXiv preprint arXiv:1704.04861, 2017.
+
+Chollet F: Xception: Deep learning with depth wise separable convolutions. Proceedings of the IEEE conference on computer vision and pattern recognition, 2017.
+
+Szegedy C, Vanhoucke V, Ioffe S, Shlens J, Wojna Z. Rethinking the inception architecture for computer vision. Proceedings of the IEEE conference on computer vision and pattern recognition. 2016. 10.1109/CVPR.2016.308
+
+Henry JB. Clinical diagnosis and management by laboratory methods. 198417: Philadelphia; WB Saunders Company
+
+Zhou J, He Q, Cheng G, Lin Z. Union-net: lightweight deep neural network model suitable for small data sets. The Journal of Supercomputing. 2023; 79; 7: 7228-7243. 10.1007/s11227-022-04963-w
+
+Guo C, Szemenyei M, Pei Y, Yi Y, Zhou W: SD-Unet: A Structured Dropout U-Net for Retinal Vessel Segmentation. 2019 IEEE 19th International Conference on Bioinformatics and Bioengineering (BIBE), 2019. https://doi.org/10.1109/BIBE.2019.00085
+
+Tang Y, Wang Y, Xu Y, Shi B, Xu C, Xu C, Xu C. Beyond dropout: Feature map distortion to regularize deep neural networks. Proceedings of the AAAI conference on artificial intelligence. 2020. 10.1609/aaai.v34i04.6057
+
+Srivastava N, Hinton G, Krizhevsky A, Sutskever I, Salakhutdinov R. Dropout: a simple way to prevent neural networks from overfitting. J Mach Learn Res. 2014; 15; 1: 1929-1958
+
+Ghiasi G, Lin TY, Le QV: DropBlock: A regularization method for convolutional networks. Proceeding of Advances in neural information processing systems 31, 2018.
+
+Luo P, Zhang R, Ren J, Peng Z, Li J. Switchable normalization for learning-to-normalize deep representation. IEEE Trans Pattern Anal Mach Intell. 2019; 43; 2: 712-728. 10.1109/TPAMI.2019.2932062
+
+Ulyanov D, Vedaldi A, Lempitsky V: Instance normalization: The missing ingredient for fast stylization. arXiv preprint arXiv:1607.08022, 2016.
+
+Ioffe S, Szegedy C: Batch normalization: Accelerating deep network training by reducing internal covariate shift. International conference on machine learning, 2015.
+
+Ba JL, Kiros JR, Hinton GE: Layer normalization. arXiv preprint arXiv:1607.06450, 2016.
+
+Luo P, Ren J, Peng Z, Zhang R, Li J: Differentiable learning-to-normalize via switchable normalization. arXiv preprint arXiv:1806.10779, 2016.
+
+Szegedy C, Liu W, Jia Y, Sermanet P, Reed S, Anguelov D, Erhan D, Vanhoucke V, Rabinovich A: Going deeper with convolutions. Proceedings of the IEEE conference on computer vision and pattern recognition, 2015.
+
+Hamker FH. Predictions of a model of spatial attention using sum-and max-pooling functions. Neurocomputing. 2004; 56: 329-343. 10.1016/j.neucom.2003.09.006
+
+Jain A, Nandakumar K, Ross A. Score normalization in multimodal biometric systems. Pattern Recognit. 2005; 38; 12: 2270-2285. 10.1016/j.patcog.2005.01.012
+
+Chollet F: Keras: Deep learning library for theano and tensorflow. Available at https://keras.io/. Accessed on 13 December 2023.
+
+Kingma DP, Ba J: Adam: A method for stochastic optimization. arXiv preprint arXiv:1412.6980, 2014.
+
+Chen W, Junsheng D, Chen Y, Fan Y, Liu H, Tan C, Shao X, Li X. The Classification of Lumbar Spondylolisthesis X-Ray Images Using Convolutional Neural Networks. J Digit Imaging Inform med. 2024. 10.1007/s10278-024-01115-9
+
+Rodríguez-Ruiz A, Krupinski E, Mordang JJ, Schilling K, Heywang-Köbrunner SH, Sechopoulos I, Mann RM. Detection of breast cancer with mammography: effect of an artificial intelligence support system. Radiology. 2019; 290; 2: 305-314. 10.1148/radiol.2018181371. 30457482
+
+~~~~~~~~
+
+By Rabul Saikia; Roopam Deka; Anupam Sarma and Salam Shuleenda Devi
+
+Reported by Author; Author; Author; Author

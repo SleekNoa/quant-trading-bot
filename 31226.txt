@@ -1,0 +1,17 @@
+3/12/26
+Recommended Next Steps / Tweaks
+
+Make MC limit configurable per-symbol or regime (optional but smart)Add to config/settings.py:Python# Live MC VaR limit — can be overridden per regime or volatility
+MC_ACCEPTABLE_VAR_PCT_BASE = 0.10
+MC_ACCEPTABLE_VAR_PCT_HIGH_VOL = 0.18   # allow more tail risk in high-vol names like NVDAThen in monte_carlo_stress_test() (risk_manager.py):Pythonacceptable_var = MC_ACCEPTABLE_VAR_PCT_BASE
+if sigma > 0.03:  # rough high-vol check (daily std >3%)
+    acceptable_var = MC_ACCEPTABLE_VAR_PCT_HIGH_VOL
+passed = var_pct < acceptable_varOr simply raise the base limit to 0.15–0.20 if you want to allow NVDA-style trades.
+Lower the MC horizon temporarily for testingPython# settings.py
+MC_HORIZON_DAYS = 10   # instead of 30 — shorter horizon = lower VaRShorter horizon reduces projected tail loss → more trades pass.
+
+Force a trade for paper testing (temporary debug)Temporarily set:PythonRUN_STRESS_TEST = False   # bypass live MC gateThen watch if the BUY executes → check Alpaca paper account for the bracket order (if SL/TP added).Re-enable RUN_STRESS_TEST = True after confirming execution flow.
+Monitor & iterate
+Run daily → see which symbols win ranking
+Track why trades get blocked (log sigma/volatility too)
+If too many blocks → tune MC params or add regime-aware limits
