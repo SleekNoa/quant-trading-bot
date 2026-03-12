@@ -1,19 +1,38 @@
-"""
-backtesting/backtester.py — Ensemble Engine Backtest
-===================================================
-Called by main.py as backtest_engine(df)
-Uses the full per-strategy comparison (MACD, RSI, BB, Stoch, SMA, DC)
-and returns the exact dict shape expected by print_backtest_header().
-"""
-
 import numpy as np
 import pandas as pd
 from config.settings import INITIAL_CAPITAL
 from risk.risk_manager import full_position_size
+"""
+backtesting/strategy_backtest.py — Per-Strategy Performance Analysis
+=====================================================================
+Runs a separate backtest for each registered strategy plugin and
+returns a comparison table showing which strategies perform best
+on the current asset/period.
+
+Inspired by the benchmarking methodology in:
+    Long et al. (2026) Table 11 — comparison of MOO3 vs individual
+    TA indicators across 110 stocks. We do the same across your
+    strategy set so you can see exactly which plugins are adding alpha.
+
+Output metrics per strategy:
+    return_pct    – total return vs initial capital
+    buy_hold      – passive benchmark
+    alpha         – return_pct - buy_hold
+    sharpe        – annualised Sharpe ratio
+    max_drawdown  – worst peak-to-trough %
+    win_rate      – % of closed trades profitable
+    n_trades      – number of round-trip trades
+    avg_trade_pct – average % gain per trade
+"""
+
+import numpy as np
+import pandas as pd
 from utils.logger import logger
+from config.settings import INITIAL_CAPITAL
+from risk.risk_manager import full_position_size
 
 
-def _run_single_backtest(df_with_signals: pd.DataFrame) -> dict | None:
+def _run_single_backtest(df_with_signals: pd.DataFrame) -> dict:
     """Run a single backtest on a df that already has signal/crossover columns."""
     if "crossover" not in df_with_signals.columns:
         return None
@@ -56,7 +75,7 @@ def _run_single_backtest(df_with_signals: pd.DataFrame) -> dict | None:
     wins     = [t for t in closed if t.get("pnl", 0) > 0]
     win_rate = len(wins) / len(closed) * 100 if closed else 0.0
 
-    trade_pcts = []
+    trade_pcts    = []
     last_buy_price = None
     for t in trades:
         if t["type"] == "BUY":
@@ -92,7 +111,16 @@ def _run_single_backtest(df_with_signals: pd.DataFrame) -> dict | None:
 
 
 def backtest_all_strategies(df_raw: pd.DataFrame) -> dict:
-    """Run backtest for every registered strategy plugin."""
+    """
+    Run a backtest for each registered strategy and return a comparison dict.
+
+    Args:
+        df_raw: clean OHLCV DataFrame (no indicators pre-computed)
+
+    Returns:
+        {strategy_name: metrics_dict, ...}
+        Plus a "COMBINED" entry for the multi-strategy consensus.
+    """
     from strategies.macd_strategy       import generate_signals as macd_gen
     from strategies.rsi_strategy        import generate_signals as rsi_gen
     from strategies.bollinger_strategy  import generate_signals as bollinger_gen
@@ -114,7 +142,8 @@ def backtest_all_strategies(df_raw: pd.DataFrame) -> dict:
         try:
             df_signals = gen_fn(df_raw.copy())
             metrics    = _run_single_backtest(df_signals)
-            results[name] = metrics if metrics else None
+            if metrics:
+                results[name] = metrics
         except Exception as e:
             logger.warning(f"[backtest] Strategy '{name}' failed: {e}")
             results[name] = None
@@ -123,7 +152,7 @@ def backtest_all_strategies(df_raw: pd.DataFrame) -> dict:
 
 
 def print_strategy_comparison(results: dict):
-    """Pretty table (already in your file — we reuse it)."""
+    """Pretty-print a side-by-side strategy performance table."""
     SEP  = "═" * 90
     SEP2 = "─" * 90
 
@@ -136,18 +165,19 @@ def print_strategy_comparison(results: dict):
     )
     logger.info(SEP2)
 
+    # Sort by Sharpe descending
     valid = {k: v for k, v in results.items() if v is not None}
-    if not valid:
-        logger.info("  No valid strategy results")
-        return
-
     sorted_results = sorted(valid.items(), key=lambda x: x[1]["sharpe"], reverse=True)
 
     for name, m in sorted_results:
         ret_str  = f"+{m['return_pct']:.1f}%" if m['return_pct'] >= 0 else f"{m['return_pct']:.1f}%"
         alp_str  = f"+{m['alpha']:.1f}%"      if m['alpha'] >= 0      else f"{m['alpha']:.1f}%"
         dd_str   = f"{m['max_drawdown']:.1f}%"
-        rank_icon = "🥇" if name == sorted_results[0][0] else "🥈" if len(sorted_results) > 1 and name == sorted_results[1][0] else ""
+
+        # Medal for top performers
+        rank_icon = ""
+        if name == sorted_results[0][0]:  rank_icon = "🥇"
+        elif name == sorted_results[1][0] if len(sorted_results) > 1 else False: rank_icon = "🥈"
 
         logger.info(
             f"  {name + ' ' + rank_icon:<24} {ret_str:>8} {alp_str:>8} "
@@ -155,54 +185,7 @@ def print_strategy_comparison(results: dict):
             f"{m['win_rate']:>7.1f}% {m['n_trades']:>7}  {m['avg_trade_pct']:>8.2f}%"
         )
 
-    buy_hold = list(valid.values())[0]["buy_hold"]
+    buy_hold = list(valid.values())[0]["buy_hold"] if valid else 0
     logger.info(SEP2)
     logger.info(f"  {'Buy & Hold (passive)':<22} {buy_hold:>+8.1f}%  (benchmark)")
     logger.info(SEP)
-
-
-# ── FUNCTIONS EXPECTED BY main.py ─────────────────────────────────────
-def backtest_engine(df: pd.DataFrame) -> dict:
-    """Main entry point called from main.py (phase 5)."""
-    per_strategy = backtest_all_strategies(df)
-
-    # Use the best strategy's metrics for the header (realistic aggregate)
-    if per_strategy:
-        valid = {k: v for k, v in per_strategy.items() if v}
-        if valid:
-            best_name = max(valid, key=lambda k: valid[k].get("sharpe", 0))
-            best = valid[best_name]
-            result = {
-                "final_value":   best.get("final_value", INITIAL_CAPITAL * 1.65),
-                "return_pct":    best.get("return_pct", 65.0),
-                "buy_hold":      best.get("buy_hold", 30.0),
-                "sharpe":        best.get("sharpe", 1.71),
-                "max_drawdown":  best.get("max_drawdown", -23.55),
-                "avg_trade_pct": best.get("avg_trade_pct", 2.5),
-                "win_rate":      best.get("win_rate", 58.3),
-                "n_trades":      best.get("n_trades", 12),
-                "per_strategy":  per_strategy
-            }
-            return result
-
-    # Fallback if nothing worked
-    return {
-        "final_value": INITIAL_CAPITAL * 1.65,
-        "return_pct": 65.0,
-        "buy_hold": 30.0,
-        "sharpe": 1.71,
-        "max_drawdown": -23.55,
-        "avg_trade_pct": 2.5,
-        "win_rate": 58.3,
-        "n_trades": 12,
-        "per_strategy": {}
-    }
-
-
-def log_per_strategy_report(per_strategy: dict):
-    """Called automatically if 'per_strategy' exists in result."""
-    print_strategy_comparison(per_strategy)
-
-
-if __name__ == "__main__":
-    logger.info("backtester.py — run via main.py")

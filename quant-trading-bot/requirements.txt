@@ -2,5 +2,7 @@ pandas
 numpy
 requests
 python-dotenv
-alpaca-trade-api
+alpaca-py
+scipy
 matplotlib
+yfinance

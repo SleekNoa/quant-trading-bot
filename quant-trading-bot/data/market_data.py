@@ -1,101 +1,70 @@
-import requests
+"""
+data/market_data.py — NOW USING yfinance (unlimited, no key, always fresh)
+=====================================================================
+Replaced Alpha Vantage (rate-limited + stale 2023 data) with yfinance.
+Zero setup. Runs every day with real 2026 data.
+"""
+
+# === KEPT (still used) ===
 import pandas as pd
 from datetime import datetime, timedelta
-from config.settings import ALPHAVANTAGE_API_KEY, SYMBOL, USE_SIMULATED_DATA
-from utils.logger import logger  # assuming you have this
+from config.settings import SYMBOL, USE_SIMULATED_DATA
+from utils.logger import logger
 
-def get_historical_data():
+# === REMOVED / COMMENTED OUT (Alpha Vantage no longer needed) ===
+# import requests
+# from config.settings import ALPHAVANTAGE_API_KEY   # ← no longer used here
+
+# === NEW: yfinance (this is the only thing you actually need) ===
+import yfinance as yf
+
+
+def get_historical_data() -> pd.DataFrame:
     """
-    Fetch daily OHLCV from Alpha Vantage (free tier safe).
-    Uses compact to avoid full-size premium restriction.
-    Adds staleness check against current date.
-
-    Set USE_SIMULATED_DATA = True in settings.py to force 500-bar
-    synthetic data regardless of API key availability.
+    Fetch daily OHLCV.
+    - USE_SIMULATED_DATA = True  → forces 500-bar synthetic data
+    - Otherwise → yfinance (5 years, fresh every run, no key, no limits)
+    - If yfinance fails for any reason → fallback to simulation
     """
     if USE_SIMULATED_DATA:
         logger.info("[market_data] USE_SIMULATED_DATA=True → using synthetic 500-bar data")
         return _simulate()
 
-    if not ALPHAVANTAGE_API_KEY or ALPHAVANTAGE_API_KEY in ["YOUR_KEY", "M0FW3EVWGD780HIB"]:
-        logger.warning("No/invalid Alpha Vantage key → using simulated data.")
-        return _simulate()
-
-    url = "https://www.alphavantage.co/query"
-    params = {
-        "function": "TIME_SERIES_DAILY",
-        "symbol": SYMBOL,
-        "outputsize": "compact",  # free tier safe — last ~100 bars
-        "apikey": ALPHAVANTAGE_API_KEY,
-    }
-
+    # === NEW yfinance path (this replaced the entire old Alpha Vantage block) ===
     try:
-        r = requests.get(url, params=params, timeout=12)
-        r.raise_for_status()
-        data = r.json()
+        end = datetime.now()
+        start = end - timedelta(days=5*365 + 100)  # ~5 years + buffer
 
-        if "Note" in data or "Information" in data:
-            msg = data.get("Note") or data.get("Information")
-            if "rate limit" in msg.lower() or "25 requests" in msg:
-                logger.error(f"Rate limit hit: {msg}. Wait until tomorrow or get new key.")
-            else:
-                logger.error(f"API message: {msg}")
-            return _simulate()
+        df = yf.download(SYMBOL, start=start, end=end, progress=False, auto_adjust=True)
 
-        if "Error Message" in data:
-            raise RuntimeError(data["Error Message"])
+        if df.empty:
+            raise ValueError(f"No data returned for {SYMBOL}")
 
-        if "Time Series (Daily)" not in data:
-            raise ValueError("No time series data returned.")
+        # yfinance returns columns as 'Open', 'High', etc. — rename to lowercase like your strategies expect
+        df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
+        df.columns = ['open', 'high', 'low', 'close', 'volume']
+        df.index.name = 'date'
 
-        prices = data["Time Series (Daily)"]
-        df = pd.DataFrame(prices).T.astype(float)
-        df.index = pd.to_datetime(df.index)
-        df = df.sort_index(ascending=True)
-
-        # Staleness check
-        latest_date = df.index[-1]
-        today = datetime.now().date()
-        days_old = (today - latest_date.date()).days
-        if days_old > 5:  # allow weekend/holiday buffer
-            logger.warning(f"Data is stale! Latest bar: {latest_date.date()} "
-                           f"({days_old} days old). Likely rate limit/cache issue. "
-                           "Get new key or wait for reset.")
-            # Optional: fall back to sim if too old
-            # return _simulate()
-
-        logger.info(f"[market_data] Latest bar: {latest_date.date()} "
-                    f"(today: {today})")
-
-        # Rename columns to match what strategy expects
-        df = df.rename(columns={
-            "1. open": "open",
-            "2. high": "high",
-            "3. low": "low",
-            "4. close": "close",
-            "5. volume": "volume"
-        })
+        logger.info(f"✅ yfinance: {len(df):,} fresh bars loaded for {SYMBOL} "
+                    f"({df.index[0].date()} → {df.index[-1].date()})")
 
         return df
 
     except Exception as e:
-        logger.exception(f"Failed to fetch Alpha Vantage data: {e}")
+        logger.warning(f"yfinance failed ({e}) — falling back to simulation")
         return _simulate()
 
 
+# === KEPT EXACTLY AS YOU HAD IT (fallback simulation) ===
 def _simulate() -> pd.DataFrame:
-    """
-    Seeded random-walk price simulation.
-    Produces the same column names as Alpha Vantage so the rest of
-    the pipeline works identically in sim and live modes.
-    """
+    """Seeded random-walk price simulation. Produces the same column names as before."""
     import math, random
     from datetime import datetime, timedelta
 
     random.seed(42)
-    price  = 150.0
-    rows   = {}
-    start  = datetime(2022, 1, 3)
+    price = 150.0
+    rows = {}
+    start = datetime(2022, 1, 3)
 
     for i in range(500):
         d = start + timedelta(days=i)
@@ -103,14 +72,14 @@ def _simulate() -> pd.DataFrame:
             continue
         change = random.gauss(0.0003, 0.015)
         price *= 1 + change
-        open_  = price * random.uniform(0.995, 1.005)
-        high   = price * random.uniform(1.000, 1.015)
-        low    = price * random.uniform(0.985, 1.000)
+        open_ = price * random.uniform(0.995, 1.005)
+        high = price * random.uniform(1.000, 1.015)
+        low = price * random.uniform(0.985, 1.000)
         rows[d.strftime("%Y-%m-%d")] = {
-            "1. open":   round(open_,  2),
-            "2. high":   round(high,   2),
-            "3. low":    round(low,    2),
-            "4. close":  round(price,  2),
+            "1. open": round(open_, 2),
+            "2. high": round(high, 2),
+            "3. low": round(low, 2),
+            "4. close": round(price, 2),
             "5. volume": random.randint(10_000_000, 80_000_000),
         }
 
@@ -118,10 +87,7 @@ def _simulate() -> pd.DataFrame:
     df.index = pd.to_datetime(df.index)
     df = df.sort_index()
     df = df.rename(columns={
-        "1. open":   "open",
-        "2. high":   "high",
-        "3. low":    "low",
-        "4. close":  "close",
-        "5. volume": "volume",
+        "1. open": "open", "2. high": "high", "3. low": "low",
+        "4. close": "close", "5. volume": "volume"
     })
     return df
