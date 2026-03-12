@@ -41,11 +41,17 @@ ALPACA_SECRET_KEY    = os.getenv("ALPACA_SECRET_KEY")
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Primary symbol for the single-ticker pipeline (reads from .env if set)
-SYMBOL = os.getenv("SOUN", "SOUN")
+SYMBOL = os.getenv("SYMBOL", "AAPL")
 
 # Multi-ticker universe — used when USE_MULTI_TICKER = True
 # The bot scans all tickers, ranks signals, then executes on the best one
-TICKERS = ["ACHR", "MNR", "LIDR", "T", "EPD"]
+TICKERS = [
+  "LIN", "XOM"
+]
+
+# holding {DO NOT REMOVE} - LIN, XOM
+# GREAT TEST {DO NOT REMOVE} - ["LIF", "DOW", "LYB", "CE", "OLN", "ACHR", "APD", "DD", "HUN",
+#            "WLK", "EMN", "ALB", "SQM", "TROX", "CBT", "LIN", "PPG", "SHW", "CC", "KRO"]
 
 # Capital allocation method when multiple signals are active
 # Options: "equal" | "score_weighted" | "sharpe_weighted"
@@ -54,6 +60,8 @@ TICKER_ALLOC_METHOD = "equal"
 # ══════════════════════════════════════════════════════════════════════════════
 # 3.  Strategy Selection & Parameters
 # ══════════════════════════════════════════════════════════════════════════════
+
+ASK_SAME_DAY_CONFIRM = True # Set to False to disable the [Y/N] prompt entirely
 
 # Change STRATEGY to switch the active strategy without touching main.py
 # Options: "sma" | "rsi" | "macd" | "bollinger" | "stochastic"
@@ -88,7 +96,7 @@ STOCH_D = 3
 # ADX measures trend STRENGTH (not direction).
 # Signals are suppressed when ADX < ADX_THRESHOLD (choppy/ranging market).
 ADX_PERIOD    = 14
-ADX_THRESHOLD = 25     # below 25 = choppy → momentum indicators produce false signals
+ADX_THRESHOLD = 28     # below 25 = choppy → momentum indicators produce false signals
 
 # OBV rising = volume confirms the price move.
 OBV_MA_PERIOD = 5      # smoothing window for OBV trend detection
@@ -112,7 +120,7 @@ SHOW_ZSCORE_IN_PROB = True
 # 6.  Capital & Risk
 # ══════════════════════════════════════════════════════════════════════════════
 
-INITIAL_CAPITAL  = 10_000   # starting paper-trade capital ($)
+INITIAL_CAPITAL  = 100_000   # starting paper-trade capital ($)
 RISK_PERCENT     = 0.01     # legacy flat-risk fallback (1% of balance per trade)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -132,7 +140,7 @@ VAR_LOOKBACK_DAYS   = 60             # ~3 months of daily returns
 # "If the expected loss in the worst 5% of outcomes exceeds MAX_CVAR_PCT,
 #  size the position down until it doesn't."
 CVAR_TAIL_PCT         = 0.02     # 2% of balance
-MAX_POSITION_PCT     = 0.25     # hard cap: never exceed 25% of balance per trade
+MAX_POSITION_PCT     = 0.1     # hard cap: never exceed 25% of balance per trade
 MAX_RISK_PER_TRADE_PCT = 0.02   # alias used in main.py risk dashboard
 
 # VaR estimation method:
@@ -160,7 +168,7 @@ PROB_TRAIN_BARS = 200
 # Probability thresholds (as percentages: 55 = 55% = 0.55 fraction)
 # A BUY crossover only fires if P(up) ≥ PROB_BUY_THRESHOLD
 # A SELL crossover only fires if P(up) ≤ (100 - PROB_SELL_THRESHOLD)
-PROB_BUY_THRESHOLD  = 55    # 55% — require slight edge before buying
+PROB_BUY_THRESHOLD  = 60    # 55% — require slight edge before buying
 PROB_SELL_THRESHOLD = 45    # 45% — sell when model leans bearish
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -216,10 +224,10 @@ MC_ACCEPTABLE_VAR_PCT = 0.10    # 10% — block trades if worse than this
 # When True: scans all TICKERS, ranks signals, then continues the pipeline
 #            on the top-ranked BUY signal (or falls back to SYMBOL if none)
 # When False: runs the single-ticker pipeline on SYMBOL only
-USE_MULTI_TICKER = False
+USE_MULTI_TICKER = True
 
-# Delay between API calls (seconds) — keeps Alpha Vantage under 5 req/min
-MULTI_TICKER_DELAY_SEC = 13.0
+# Time Delay between API calls (seconds) — keeps Alpha Vantage under 5 req/min
+MULTI_TICKER_DELAY_SEC = 1.5
 
 # Minimum bar count to include a ticker in the scan
 MULTI_TICKER_MIN_BARS = 50
@@ -251,7 +259,7 @@ TAKE_PROFIT_PCT = 0.08          # 8% target → ~1.6:1 reward:risk with 5% stop
 
 # Minimum signal probability required to pass the signal gate (%)
 # Uses the probability estimator output (buy_3d_pct / sell_3d_pct scale 0-100)
-MIN_SIGNAL_PROBABILITY = 50     # 50% for test 55% = same as PROB_BUY_THRESHOLD
+MIN_SIGNAL_PROBABILITY = 55     # 50% for test 55% = same as PROB_BUY_THRESHOLD
 
 # Run Monte Carlo stress test before each live BUY (live gate, risk_manager.py)
 RUN_STRESS_TEST = True

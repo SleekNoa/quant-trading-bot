@@ -238,6 +238,70 @@ def sell(symbol: str, qty: int = None) -> dict | None:
         logger.error(f"[broker] SELL failed: {e}")
         return None
 
+def get_today_activity(symbol: str) -> dict:
+    """
+    Check whether we have an open position or pending orders for symbol today.
+    Used by main.py to prevent duplicate BUY execution.
+    Primary guard: get_position() (proven reliable).
+    Secondary: open order scan (best-effort).
+    """
+    _zero = {
+        "bought_qty":         0,
+        "sold_qty":           0,
+        "net_qty":            0,
+        "pending_buy_count":  0,
+        "pending_sell_count": 0,
+        "has_open_position":  False,
+    }
+
+    # ── Primary: open position check ─────────────────────────────────────────
+    position = get_position(symbol)
+    has_position = position is not None and position["qty"] > 0
+
+    result = dict(_zero)
+    result["has_open_position"] = has_position
+    if has_position:
+        result["bought_qty"] = position["qty"]
+
+    # ── Secondary: open orders scan ───────────────────────────────────────────
+    client = _get_client()
+    if client is None:
+        logger.warning("[broker] get_today_activity: no client")
+        return result
+
+    try:
+        if ALPACA_PY_AVAILABLE:
+            import datetime, pytz
+            tz    = pytz.timezone("America/New_York")
+            now   = datetime.datetime.now(tz)
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end   = now.replace(hour=23, minute=59, second=59, microsecond=0)
+
+            logger.info(f"[broker] Scanning open orders for {symbol} ({start.date()})")
+
+            open_req = GetOrdersRequest(
+                status="open",
+                after=start.isoformat(),
+                until=end.isoformat(),
+                limit=500,
+            )
+            all_open = client.get_orders(open_req)
+            logger.info(f"[broker] Open orders returned: {len(all_open)}")
+
+            for o in all_open:
+                if str(o.symbol) != symbol:
+                    continue
+                side = str(o.side).lower()
+                if "buy"  in side: result["pending_buy_count"]  += 1
+                if "sell" in side: result["pending_sell_count"] += 1
+
+        result["net_qty"] = result["bought_qty"] - result["sold_qty"]
+        logger.info(f"[broker] Activity for {symbol}: {result}")
+
+    except Exception as e:
+        logger.error(f"[broker] get_today_activity scan failed: {e}", exc_info=True)
+
+    return result
 
 def close_position(symbol: str) -> dict | None:
     """Convenience: close entire position immediately."""

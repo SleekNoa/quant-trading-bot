@@ -64,7 +64,7 @@ from strategies.probability_estimator import (
     reset_probability_model,
 )
 from backtesting.backtester import backtest_engine, log_per_strategy_report
-from execution.broker import buy, sell, get_account, get_position
+from execution.broker import buy, sell, get_account, get_position, get_today_activity
 from risk.risk_manager import (
     calculate_position_size, compute_historical_var, compute_cvar,
     check_drawdown_circuit_breaker, passes_signal_gate,
@@ -79,7 +79,7 @@ from config.settings import (
     VAR_CONFIDENCE, MAX_RISK_PER_TRADE_PCT,
     MAX_PORTFOLIO_DRAWDOWN_PCT, DAILY_LOSS_LIMIT_PCT,
     MIN_SIGNAL_PROBABILITY, USE_STOP_LOSS, STOP_LOSS_PCT,
-    RUN_STRESS_TEST,
+    RUN_STRESS_TEST, ASK_SAME_DAY_CONFIRM,
     # Walk-forward
     USE_WALK_FORWARD, WF_TRAIN_BARS, WF_TEST_BARS, WF_STEP_BARS,
     # Monte Carlo
@@ -463,7 +463,51 @@ def run():
         logger.info(SEP + "\n")
         return
 
-    # BUY path
+        # BUY path
+        # ── Same-day duplicate guard ──────────────────────────────────────────────
+    from execution.broker import get_today_activity
+    activity = get_today_activity(active_symbol)
+
+    has_position = activity["has_open_position"]
+    pending_buy = activity["pending_buy_count"] > 0
+    pending_sell = activity["pending_sell_count"] > 0
+
+    should_prompt = has_position or pending_buy or pending_sell
+
+    if should_prompt:
+        logger.warning(
+            f"[main] ⚠️  Duplicate guard triggered for {active_symbol}: "
+            f"open_position={has_position} | bought_qty={activity['bought_qty']} "
+            f"| pending_buy={activity['pending_buy_count']} "
+            f"| pending_sell={activity['pending_sell_count']}"
+        )
+        if not ASK_SAME_DAY_CONFIRM:
+            logger.info("[main] ASK_SAME_DAY_CONFIRM=False — skipping duplicate BUY automatically.")
+            logger.info(SEP + "\n")
+            return
+
+        while True:
+            try:
+                answer = input(
+                    f"\n⚠️  Active position/order exists for {active_symbol}. "
+                    f"Execute ANOTHER BUY? [Y/N]: "
+                ).strip().upper()
+            except EOFError:
+                logger.warning("[main] Non-interactive mode — skipping duplicate BUY automatically")
+                logger.info(SEP + "\n")
+                return
+            if answer in ("Y", "YES"):
+                logger.info("[main] User confirmed — proceeding with BUY.")
+                break
+            elif answer in ("N", "NO"):
+                logger.info("[main] User declined duplicate BUY — skipping.")
+                logger.info(SEP + "\n")
+                return
+            else:
+                print("Please answer Y or N.")
+    else:
+        logger.info(f"[broker] No duplicate activity detected for {active_symbol} — proceeding.")
+
     logger.info("[ 7 / 7 ]  Executing BUY...")
     qty = calculate_position_size(cash, price, df)
     if qty <= 0:
