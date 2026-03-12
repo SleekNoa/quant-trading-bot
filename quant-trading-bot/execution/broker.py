@@ -202,16 +202,33 @@ def sell(symbol: str, qty: int = None) -> dict | None:
             order_data = MarketOrderRequest(
                 symbol=symbol,
                 qty=qty,
-                side=OrderSide.SELL,
+                side=OrderSide.BUY,
                 time_in_force=TimeInForce.GTC,
             )
+
+            bracket_needed = False
+
+            if USE_STOP_LOSS and stop_loss_price:
+                order_data.stop_loss = StopLossRequest(
+                    stop_price=round(stop_loss_price, 2)
+                )
+                bracket_needed = True
+
+            if USE_TAKE_PROFIT:
+                # Approximate take-profit price (use last close or fetch quote for precision)
+                # For simplicity here we use the expected entry ≈ current price
+                # In production: fetch client.get_latest_quote(symbol).ask_price
+                approx_entry = stop_loss_price / (1 - STOP_LOSS_PCT) if stop_loss_price else price  # rough
+                tp_price = round(approx_entry * (1 + TAKE_PROFIT_PCT), 2)
+                order_data.take_profit = TakeProfitRequest(
+                    limit_price=tp_price
+                )
+                bracket_needed = True
+
+            if bracket_needed:
+                order_data.order_class = "bracket"
+
             order = client.submit_order(order_data)
-            order_id = order.id
-        else:
-            order = client.submit_order(
-                symbol=symbol, qty=qty, side="sell",
-                type="market", time_in_force="gtc"
-            )
             order_id = order.id
 
         logger.info(f"[broker] ✅ SELL {qty}x {symbol}  submitted  · id: {order_id}")

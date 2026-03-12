@@ -6,3 +6,4 @@ alpaca-py
 scipy
 matplotlib
 yfinance
+scikit-learn

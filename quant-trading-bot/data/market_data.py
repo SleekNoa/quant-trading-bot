@@ -19,41 +19,44 @@ from utils.logger import logger
 import yfinance as yf
 
 
-def get_historical_data() -> pd.DataFrame:
+# ... (keep all existing imports)
+
+def get_historical_data(symbol: str = None) -> pd.DataFrame:
     """
     Fetch daily OHLCV.
-    - USE_SIMULATED_DATA = True  → forces 500-bar synthetic data
-    - Otherwise → yfinance (5 years, fresh every run, no key, no limits)
-    - If yfinance fails for any reason → fallback to simulation
+    - If symbol is None → uses SYMBOL from config.settings
+    - Otherwise → uses the provided symbol
+    - USE_SIMULATED_DATA = True → forces 500-bar synthetic data (ignores symbol)
     """
     if USE_SIMULATED_DATA:
         logger.info("[market_data] USE_SIMULATED_DATA=True → using synthetic 500-bar data")
-        return _simulate()
+        return _simulate()   # simulation doesn't use symbol anyway
 
-    # === NEW yfinance path (this replaced the entire old Alpha Vantage block) ===
+    # Determine which symbol to fetch
+    fetch_symbol = symbol if symbol is not None else SYMBOL
+
     try:
         end = datetime.now()
         start = end - timedelta(days=5*365 + 100)  # ~5 years + buffer
 
-        df = yf.download(SYMBOL, start=start, end=end, progress=False, auto_adjust=True)
+        df = yf.download(fetch_symbol, start=start, end=end, progress=False, auto_adjust=True)
 
         if df.empty:
-            raise ValueError(f"No data returned for {SYMBOL}")
+            raise ValueError(f"No data returned for {fetch_symbol}")
 
-        # yfinance returns columns as 'Open', 'High', etc. — rename to lowercase like your strategies expect
+        # Standardize column names (your strategies expect lowercase)
         df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
         df.columns = ['open', 'high', 'low', 'close', 'volume']
         df.index.name = 'date'
 
-        logger.info(f"✅ yfinance: {len(df):,} fresh bars loaded for {SYMBOL} "
+        logger.info(f"✅ yfinance: {len(df):,} fresh bars loaded for {fetch_symbol} "
                     f"({df.index[0].date()} → {df.index[-1].date()})")
 
         return df
 
     except Exception as e:
-        logger.warning(f"yfinance failed ({e}) — falling back to simulation")
+        logger.warning(f"yfinance failed for {fetch_symbol} ({e}) — falling back to simulation")
         return _simulate()
-
 
 # === KEPT EXACTLY AS YOU HAD IT (fallback simulation) ===
 def _simulate() -> pd.DataFrame:

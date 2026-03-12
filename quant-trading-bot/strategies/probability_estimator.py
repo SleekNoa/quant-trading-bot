@@ -1,112 +1,145 @@
 """
-Improved 3-day crossover probability estimator.
-Uses Brownian motion with drift on the indicator gap.
-Logic now correctly distinguishes current regime and target direction.
+Probability Estimator — directional signal quality gate.
+=========================================================
+Drop-in replacement for the original Brownian-motion estimator.
+
+The original estimator used a Gaussian CDF on the indicator gap
+(gap_now, drift, vol).  It produced 0% outputs because:
+    1. gap_now can be very large or very small → z becomes extreme → CDF ≈ 0 or 1
+    2. vol ≤ 0 edge-cases returned 0% with no warning
+    3. The regime-aware assignment was inverted for some MACD configurations
+
+This module replaces the formula with a LogisticProbabilityModel
+(scikit-learn) trained on 6 engineered features.  When scikit-learn is
+not installed it falls back to a historical base-rate estimate so the
+system degrades gracefully rather than crashing.
+
+Interface preserved
+-------------------
+The function ``estimate_crossover_probability(df)`` returns exactly the
+same dict shape as the original:
+
+    {
+        "buy_3d_pct":  float  (0 – 100)
+        "sell_3d_pct": float  (0 – 100)
+        "explanation": str
+    }
+
+All callers in main.py and risk_manager.py continue to work unchanged.
+
+Usage
+-----
+    from strategies.probability_estimator import estimate_crossover_probability
+    probs = estimate_crossover_probability(df)
+    # probs["buy_3d_pct"]  → 63.2   (strong bullish signal)
+    # probs["sell_3d_pct"] → 36.8
+    # probs["explanation"] → "LogisticModel [trained] | P(up)=63.2% ..."
+
+Reset per ticker (multi-ticker mode)
+-------------------------------------
+    from strategies.probability_estimator import reset_probability_model
+    reset_probability_model()
 """
 
-import numpy as np
-from scipy.special import erf
-from config.settings import STRATEGY
+from __future__ import annotations
 
-def _norm_cdf(x: float) -> float:
-    """Pure NumPy approximation of normal CDF using erf."""
-    return 0.5 * (1.0 + erf(x / np.sqrt(2.0)))
+from config.settings import (
+    PROB_TRAIN_BARS,
+    PROB_BUY_THRESHOLD,
+    PROB_SELL_THRESHOLD,
+)
+from models.logistic_probability import get_or_train_model, reset_model
 
 
-def estimate_crossover_probability(df):
+# ── Public API ─────────────────────────────────────────────────────────────────
+
+def estimate_crossover_probability(df) -> dict:
     """
-    Returns dict with:
-        buy_3d_pct:   float (0–100) — estimated prob of bullish crossover in next 3 days
-        sell_3d_pct:  float (0–100) — estimated prob of bearish crossover in next 3 days
-        explanation:  str
+    Estimate directional probability using logistic regression.
+
+    The model is trained once (lazily, on first call) on the last
+    PROB_TRAIN_BARS bars of df, then cached for the remainder of the run.
+    Subsequent calls use the cached model — only the last row of df is
+    evaluated for prediction.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        OHLCV + indicators DataFrame.  Required columns:  close
+        Optional (used as features if present):
+            short_ma, long_ma, rsi, volume, high, low
+
+    Returns
+    -------
+    dict
+        buy_3d_pct  : float 0–100  estimated P(up move)
+        sell_3d_pct : float 0–100  estimated P(down move)
+        explanation : str          human-readable one-liner for the log
     """
-    if len(df) < 20:
+    if len(df) < 30:
         return {
-            "buy_3d_pct": 0,
-            "sell_3d_pct": 0,
-            "explanation": "Not enough history (need ≥20 bars for drift/vol)"
+            "buy_3d_pct":  0.0,
+            "sell_3d_pct": 0.0,
+            "explanation": "Insufficient history (need ≥ 30 bars)",
         }
 
-    latest = df.iloc[-1]
-    recent = df.iloc[-20:]   # short window for local drift/vol
+    # Thresholds stored in settings as integers (55, 45); convert to fractions
+    buy_thresh  = PROB_BUY_THRESHOLD  / 100.0
+    sell_thresh = PROB_SELL_THRESHOLD / 100.0
 
-    gap_series = None
-    strategy_name = "Unknown"
+    model   = get_or_train_model(df, PROB_TRAIN_BARS, buy_thresh, sell_thresh)
+    up_prob = model.predict(df)       # P(next bar closes UP)
+    dn_prob = 1.0 - up_prob
 
-    if STRATEGY == "macd" and "macd" in latest and "macd_signal" in latest:
-        gap_series = recent["macd"] - recent["macd_signal"]
-        strategy_name = "MACD"
-    elif STRATEGY in ("sma", "moving_average") and all(c in latest for c in ["short_ma", "long_ma"]):
-        gap_series = recent["short_ma"] - recent["long_ma"]
-        strategy_name = "SMA"
-    # Add other strategies here when they have a meaningful signed gap
+    buy_pct  = round(up_prob * 100, 1)
+    sell_pct = round(dn_prob * 100, 1)
 
-    if gap_series is None or gap_series.isna().all():
-        # Fallback — very rough historical base rate
-        sig_count = (df["crossover"] != 0).sum()
-        if sig_count < 5:
-            return {"buy_3d_pct": 0, "sell_3d_pct": 0, "explanation": "Too few signals for fallback rate"}
-        avg_bars_per_signal = len(df) / sig_count
-        base_prob = min(1.0, 3.0 / avg_bars_per_signal)
-        return {
-            "buy_3d_pct": round(base_prob * 50, 1),
-            "sell_3d_pct": round(base_prob * 50, 1),
-            "explanation": f"Historical base rate (~1 signal every {avg_bars_per_signal:.1f} bars)"
-        }
+    # ── Determine current crossover context ───────────────────────────────────
+    direction = "no crossover"
+    if "crossover" in df.columns:
+        last_cross = int(df["crossover"].iloc[-1])
+        if last_cross == 1:
+            direction = "bullish crossover"
+        elif last_cross == -1:
+            direction = "bearish crossover"
 
-    gap_now = gap_series.iloc[-1]
-    drift = gap_series.diff().mean()           # daily change in gap
-    vol = gap_series.diff().std()              # volatility of gap changes
+    # ── Confidence label ──────────────────────────────────────────────────────
+    edge = abs(up_prob - 0.5)
+    confidence = (
+        "high confidence"     if edge > 0.15 else
+        "moderate confidence" if edge > 0.07 else
+        "low confidence (near 50/50)"
+    )
 
-    if vol <= 0 or np.isnan(vol):
-        return {"buy_3d_pct": 0, "sell_3d_pct": 0, "explanation": "No volatility in gap"}
-
-    T = 3.0
-    # Probability that gap reaches / crosses zero in time T
-    # We use the sign-consistent formulation
-    z = (-gap_now - drift * T) / (vol * np.sqrt(T))
-    prob_cross = _norm_cdf(z)   # P(gap ≤ 0 at time T | current gap_now)
-
-    # ── Regime-aware assignment ───────────────────────────────────────────────
-    display_prob = round(min(prob_cross * 100, 70.0), 1)  # single capped value used everywhere
-
-    if gap_now > 0:
-        # Already bullish (positive gap) → crossing zero means bearish crossover
-        buy_3d_pct  = 0.0
-        sell_3d_pct = display_prob
-        regime      = "Bullish"
-        forecast    = f"Bearish crossover in 3 days: {display_prob}%"
-    elif gap_now < 0:
-        # Already bearish → crossing zero means bullish crossover
-        buy_3d_pct  = display_prob
-        sell_3d_pct = 0.0
-        regime      = "Bearish"
-        forecast    = f"Bullish crossover in 3 days: {display_prob}%"
+    # ── Model status tag ──────────────────────────────────────────────────────
+    if model.is_trained:
+        status = f"trained on {PROB_TRAIN_BARS} bars"
     else:
-        # Exactly at zero — symmetric
-        buy_3d_pct  = display_prob
-        sell_3d_pct = display_prob
-        regime      = "Neutral"
-        forecast    = f"Crossover either direction in 3 days: {display_prob}%"
+        status = f"fallback — {model.last_error}"
 
-    # ── Strength qualifier (based on capped display_prob for consistency) ─────
-    strength = ""
-    if display_prob >= 65:
-        strength = " (strong reversal pressure)"
-    elif display_prob >= 50:
-        strength = " (moderate reversal pressure)"
-    elif display_prob >= 35:
-        strength = " (mild reversal pressure)"
-
-    # ── Human-readable explanation ────────────────────────────────────────────
-    expl = (
-        f"{strategy_name} gap = {gap_now:.3f}  |  "
-        f"z = {z:.2f}  |  μ = {drift:.4f}  |  σ = {vol:.4f}  |  "
-        f"Current regime: {regime}  →  {forecast}{strength}"
+    explanation = (
+        f"LogisticModel [{status}]  |  "
+        f"P(up)={buy_pct}%  P(dn)={sell_pct}%  |  "
+        f"Signal: {direction}  |  {confidence}"
     )
 
     return {
-        "buy_3d_pct": buy_3d_pct,
-        "sell_3d_pct": sell_3d_pct,
-        "explanation": expl
+        "buy_3d_pct":  buy_pct,
+        "sell_3d_pct": sell_pct,
+        "explanation": explanation,
     }
+
+
+def reset_probability_model() -> None:
+    """
+    Clear the cached model.
+
+    Call this before processing a new ticker in multi-ticker mode so
+    each ticker gets its own model trained on its own price history.
+
+    Example:
+        for ticker, df in ticker_data.items():
+            reset_probability_model()
+            probs = estimate_crossover_probability(df)
+    """
+    reset_model()
