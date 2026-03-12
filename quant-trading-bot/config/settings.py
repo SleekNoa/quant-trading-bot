@@ -8,7 +8,7 @@ ALPHAVANTAGE_API_KEY = os.getenv("ALPHAVANTAGE_API_KEY")
 ALPACA_API_KEY    = os.getenv("ALPACA_API_KEY")
 ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
 
-SYMBOL = os.getenv("SYMBOL", "ACHR")
+SYMBOL = os.getenv("ONDS", "ONDS")
 
 # ── Strategy Selection ────────────────────────────────────────────────
 # Change this value to switch strategies without touching main.py
@@ -36,3 +36,27 @@ INITIAL_CAPITAL = 10000
 RISK_PERCENT    = 0.01
 
 SHOW_ZSCORE_IN_PROB = True
+
+# ── ADX Trend Filter ──────────────────────────────────────────────────
+# ADX measures trend STRENGTH (not direction). Signals are only taken
+# when ADX >= ADX_THRESHOLD, meaning the market is actually trending.
+# Below 25 = choppy/ranging — momentum indicators produce false signals.
+ADX_PERIOD    = 14
+ADX_THRESHOLD = 25
+
+# ── OBV Volume Confirmation ───────────────────────────────────────────
+# OBV rising = buying pressure confirms the move.
+# OBV_MA_PERIOD is the smoothing window for OBV trend detection.
+OBV_MA_PERIOD = 5
+
+# ── Filter Flags (set False to disable either filter) ────────────────
+USE_ADX_FILTER = True
+USE_OBV_FILTER = True
+
+# ── Data Source ───────────────────────────────────────────────────────
+# True  = always use 500-bar synthetic random-walk (tests strategy logic)
+# False = use live Alpha Vantage data (real OHLCV, ~100 bars free tier)
+# NOTE: Simulated data is NOT real market data. Use it to test that the
+# strategy and filters behave correctly over a full cycle, not to predict
+# real performance.
+USE_SIMULATED_DATA = False

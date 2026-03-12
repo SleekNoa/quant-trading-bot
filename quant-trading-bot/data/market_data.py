@@ -1,7 +1,7 @@
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
-from config.settings import ALPHAVANTAGE_API_KEY, SYMBOL
+from config.settings import ALPHAVANTAGE_API_KEY, SYMBOL, USE_SIMULATED_DATA
 from utils.logger import logger  # assuming you have this
 
 def get_historical_data():
@@ -9,7 +9,14 @@ def get_historical_data():
     Fetch daily OHLCV from Alpha Vantage (free tier safe).
     Uses compact to avoid full-size premium restriction.
     Adds staleness check against current date.
+
+    Set USE_SIMULATED_DATA = True in settings.py to force 500-bar
+    synthetic data regardless of API key availability.
     """
+    if USE_SIMULATED_DATA:
+        logger.info("[market_data] USE_SIMULATED_DATA=True → using synthetic 500-bar data")
+        return _simulate()
+
     if not ALPHAVANTAGE_API_KEY or ALPHAVANTAGE_API_KEY in ["YOUR_KEY", "M0FW3EVWGD780HIB"]:
         logger.warning("No/invalid Alpha Vantage key → using simulated data.")
         return _simulate()
