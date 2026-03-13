@@ -91,6 +91,9 @@ from config.settings import (
     STRATEGY,
 )
 
+from config.settings import USE_MOO3_PLUGIN, MOO3_PLUGIN_WEIGHT
+from genetic.gp_engine import load_and_register_moo3
+
 SEP  = "=" * 70
 SEP2 = "-" * 70
 
@@ -205,6 +208,7 @@ def run_walk_forward(df):
 
 # ── Monte Carlo runner ─────────────────────────────────────────────────────────
 
+
 def run_backtest_monte_carlo(result):
     """Extract trade returns from backtest result and run MC robustness test."""
     try:
@@ -213,8 +217,20 @@ def run_backtest_monte_carlo(result):
             extract_trade_returns, print_monte_carlo_report,
         )
 
-        trades  = result.get("trades", [])
-        returns = extract_trade_returns(trades)
+        logger.info("[MC DEBUG] result has 'trades'? %s  len=%d",
+                    "trades" in result,
+                    len(result.get("trades", [])))
+        logger.info("[MC DEBUG] result has 'trade_returns'? %s  len=%d",
+                    "trade_returns" in result,
+                    len(result.get("trade_returns", [])))
+
+        # Prefer pre-computed returns if they exist
+        returns = result.get("trade_returns", None)
+
+        if returns is None or len(returns) == 0:
+            # Fallback to extracting from trades list
+            trades = result.get("trades", [])
+            returns = extract_trade_returns(trades)
 
         if len(returns) < 3:
             logger.info(
@@ -227,6 +243,23 @@ def run_backtest_monte_carlo(result):
             f"           Running {MC_SIMULATIONS:,} MC paths "
             f"over {len(returns)} closed trades..."
         )
+
+        import numpy as np
+        from collections import Counter
+
+        # ── Temporary diagnostics ──────────────────────────────────────────────
+        # logger.info("[MC DIAG] Number of trades: %d", len(returns))
+        # logger.info("[MC DIAG] Mean trade return: %.4f%%", np.mean(returns))
+        # logger.info("[MC DIAG] Std dev of trade returns: %.4f%%", np.std(returns))
+        # logger.info("[MC DIAG] Min / Max return: %.2f%% / %.2f%%", np.min(returns), np.max(returns))
+
+        # unique_returns = np.unique(np.round(returns, 4))  # round to 4 decimals to catch near-duplicates
+        # logger.info("[MC DIAG] Number of unique return values (rounded 4 dec): %d", len(unique_returns))
+        # logger.info("[MC DIAG] First 8 unique values: %s", unique_returns[:8].tolist())
+
+        # from collections import Counter
+        # common = Counter(np.round(returns, 4)).most_common(6)
+        # logger.info("[MC DIAG] 6 most common rounded returns: %s", common)
 
         mc = monte_carlo_test(
             returns,
@@ -370,6 +403,11 @@ def run():
     logger.info("[ 2 / 7 ]  Computing indicators...")
     df = prepare_indicators(df)
     logger.info("           MACD / RSI / Bollinger / Stochastic / ADX / OBV ready")
+
+    # ── One-time MOO3 registration ────────────────────────────────────
+    if USE_MOO3_PLUGIN:
+        if not load_and_register_moo3(df, weight=MOO3_PLUGIN_WEIGHT):
+            logger.info("  [MOO3] No saved model — run: python genetic/run_genetic.py")
 
     # ── 3. Regime detection ───────────────────────────────────────────────────
     logger.info("[ 3 / 7 ]  Detecting market regime...")

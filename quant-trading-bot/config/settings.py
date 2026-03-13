@@ -25,6 +25,13 @@ Sections
 
 import os
 from dotenv import load_dotenv
+import pandas as pd
+from utils import load_tickers
+
+
+
+
+
 
 load_dotenv()
 
@@ -45,13 +52,18 @@ SYMBOL = os.getenv("SYMBOL", "AAPL")
 
 # Multi-ticker universe — used when USE_MULTI_TICKER = True
 # The bot scans all tickers, ranks signals, then executes on the best one
-TICKERS = [
-  "LIN", "XOM"
-]
+#TICKERS = [
+ # "ACHR","LIF","IONQ","MVIS","BBBYQ","HILS","SNTI","GFAI","CXAI","AIKI",
+#"FFIE","EVGO","MULN","HCDI","KAVL","CRKN","SOPA","VRAX","IMPP","CEI",
+#"SIDU","ATNF","RETO","VINE","HUSA"
+
+#]
+
+TICKERS = load_tickers()
 
 # holding {DO NOT REMOVE} - LIN, XOM
 # GREAT TEST {DO NOT REMOVE} - ["LIF", "DOW", "LYB", "CE", "OLN", "ACHR", "APD", "DD", "HUN",
-#            "WLK", "EMN", "ALB", "SQM", "TROX", "CBT", "LIN", "PPG", "SHW", "CC", "KRO"]
+#            "WLK", "EMN", "ALB", "SQM", "TROX", "CBT", "EPD", "PPG", "SHW", "CC", "KRO"]
 
 # Capital allocation method when multiple signals are active
 # Options: "equal" | "score_weighted" | "sharpe_weighted"
@@ -202,10 +214,10 @@ WF_STEP_BARS: int | None = None
 USE_BACKTEST_MC = True
 
 # Number of simulation paths (5 000 is the Wang et al. standard)
-MC_SIMULATIONS = 5_000
+MC_SIMULATIONS = 10_000
 
 # Number of drawdown simulation paths (2 000 is sufficient for percentiles)
-MC_DD_SIMULATIONS = 2_000
+MC_DD_SIMULATIONS = 5_000
 
 # Set an integer for reproducible results; None = different each run
 MC_SEED: int | None = None
@@ -234,6 +246,37 @@ MULTI_TICKER_MIN_BARS = 50
 
 # Maximum signals to rank and display (top-N table)
 MULTI_TICKER_TOP_N = 3
+
+# ══════════════════════════════════════════════════════════════════
+# 14. MOO3 Genetic Programming Engine                       ← NEW
+#     Reference: Long, Kampouridis & Papastylianou (2026).
+#     "Multi-objective GP-based algorithmic trading using
+#      directional changes." AI Review 59:39.
+# ══════════════════════════════════════════════════════════════════
+
+# Enable loading a pre-trained MOO3 model at main.py startup
+# HOW TO RUN python genetic/run_genetic.py --pop 20 --gens 15 (MORE GENS = SLOWER)
+# Set to True after running: python genetic/run_genetic.py
+USE_MOO3_PLUGIN = True  # flip to True after first training run
+
+# MOO3 engine training parameters
+MOO3_POP_SIZE = 50  # population size P (paper default: 50)
+MOO3_N_GENS = 50  # number of generations N (paper default: 50)
+MOO3_TOURNAMENT = 3  # tournament size k
+MOO3_P_CROSSOVER = 0.80  # subtree crossover probability
+MOO3_P_MUTATION = 0.10  # point mutation probability
+MOO3_MAX_DEPTH = 5  # maximum tree depth
+
+# Modified Sharpe Ratio weights for Pareto front selection
+# Must sum to 1.0  (paper uses equal weights; we match user preference)
+MOO3_W_TR = 0.40  # Total Return weight
+MOO3_W_WR = 0.30  # Win Rate weight
+MOO3_W_DD = 0.30  # Max Drawdown penalty weight
+
+# Plugin weight in the ensemble strategy engine
+# (DC strategy uses 2.0 per Long et al. results; MOO3 can be higher)
+MOO3_PLUGIN_WEIGHT = 2.5
+# ──────────────────────────────────────────────────────────────────
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 12. Circuit-Breakers & Stop-Loss

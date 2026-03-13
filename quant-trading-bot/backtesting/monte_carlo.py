@@ -40,6 +40,8 @@ from __future__ import annotations
 
 import numpy as np
 from typing import Optional
+from utils.logger import logger
+
 
 SEP  = "=" * 70
 SEP2 = "-" * 70
@@ -54,101 +56,83 @@ def monte_carlo_test(
     seed:            Optional[int] = None,
 ) -> dict:
     """
-    Shuffle the trade-return sequence N times and collect final equity.
-
-    Parameters
-    ----------
-    trade_returns   : per-trade percentage returns, e.g. [+2.1, -0.8, +1.4]
-                      Extract from backtester: compute (sell_price - buy_price)
-                      / buy_price * 100 for each closed trade pair.
-    simulations     : Monte Carlo paths  (default 5 000 per Wang et al. 2026)
-    initial_capital : starting equity for each path
-    seed            : integer for reproducibility; None = random each run
-
-    Returns
-    -------
-    dict with full distributional statistics and a binary "passed" flag.
+    Fixed permutation Monte Carlo.
+    Now tracks full equity paths → meaningful variation in minimum equity.
     """
     if not trade_returns or len(trade_returns) < 3:
         return {
-            "error":       f"Need ≥ 3 closed trades; got {len(trade_returns) if trade_returns else 0}",
-            "n_trades":    len(trade_returns) if trade_returns else 0,
-            "simulations": 0,
-            "passed":      False,
+            "error": f"Need ≥ 3 closed trades; got {len(trade_returns) if trade_returns else 0}"
         }
 
     rng = np.random.default_rng(seed)
     arr = np.asarray(trade_returns, dtype=float)
-
-    # ── Simulate N shuffled paths ──────────────────────────────────────────────
-    # Using vectorised multiplication where possible for speed
     n_trades = len(arr)
-    # Matrix approach: shuffle each row independently
+
+    # ── Generate all shuffled paths at once ────────────────────────────────────
     shuffled = np.stack([rng.permutation(arr) for _ in range(simulations)])
-    # Compound return: product of (1 + r/100) across trade axis
-    multipliers = np.prod(1.0 + shuffled / 100.0, axis=1)
-    finals      = initial_capital * multipliers
+
+    # ── Build full equity paths (cumulative product) ───────────────────────────
+    multipliers = 1.0 + shuffled / 100.0
+    equity_paths = initial_capital * np.cumprod(multipliers, axis=1)
+
+    # ── Extract statistics per path ────────────────────────────────────────────
+    finals = equity_paths[:, -1]          # final equity
+    mins   = np.min(equity_paths, axis=1) # lowest equity during path
+
+    returns_pct = (finals / initial_capital - 1.0) * 100.0
+
+    # Sort for percentiles
     finals.sort()
+    mins.sort()
+    n = len(finals)
 
-    n            = len(finals)
-    returns_pct  = (finals / initial_capital - 1.0) * 100.0
+    def _idx(p: float) -> int:
+        return int(np.clip(n * p, 0, n - 1))
 
-    # ── Percentile indices ─────────────────────────────────────────────────────
-    def _idx(pct: float) -> int:
-        return int(np.clip(n * pct, 0, n - 1))
+    # ── Trade-level analytics (order-independent) ──────────────────────────────
+    wins   = arr[arr > 0]
+    losses = arr[arr < 0]
+    win_rate = len(wins) / n_trades if n_trades else 0.0
+    avg_win  = float(wins.mean())   if len(wins)   else 0.0
+    avg_loss = float(abs(losses.mean())) if len(losses) else 1e-9
+    payoff   = avg_win / avg_loss
+    kelly    = max(0.0, (payoff * win_rate - (1 - win_rate)) / payoff)
 
-    # ── Trade-level statistics ─────────────────────────────────────────────────
-    wins      = arr[arr > 0]
-    losses    = arr[arr < 0]
-    win_rate  = len(wins) / n_trades if n_trades > 0 else 0.0
-    avg_win   = float(wins.mean())          if len(wins)   > 0 else 0.0
-    avg_loss  = float(abs(losses.mean()))   if len(losses) > 0 else 1e-9
-    payoff    = avg_win / avg_loss
-
-    # Kelly criterion (full Kelly and half-Kelly)
-    # f* = (b × p - q) / b,   b = payoff, p = win_rate, q = 1 - win_rate
-    kelly = max(0.0, (payoff * win_rate - (1.0 - win_rate)) / payoff)
-
-    prob_loss   = float(np.sum(finals < initial_capital) / n * 100)
+    prob_loss  = float(np.mean(finals < initial_capital) * 100)
     prob_profit = 100.0 - prob_loss
+    prob_ruin   = float(np.mean(mins <= 0) * 100)
 
-    # ── Pass/fail criteria ─────────────────────────────────────────────────────
-    # PASS = median path is profitable AND probability of loss < 50%
     median_final = float(finals[n // 2])
     passed       = (median_final > initial_capital) and (prob_loss < 50.0)
 
     return {
-        # Configuration
         "simulations":       simulations,
         "n_trades":          n_trades,
         "initial_capital":   initial_capital,
 
-        # Central tendency
-        "median_final":      float(median_final),
-        "mean_final":        float(finals.mean()),
-        "median_return_pct": float(returns_pct[n // 2]),
-        "mean_return_pct":   float(returns_pct.mean()),
+        # Final equity (mathematically constant)
+        "median_final":      round(median_final, 2),
+        "mean_final":        round(float(finals.mean()), 2),
+        "p5_final":          round(float(finals[_idx(0.05)]), 2),
+        "p95_final":         round(float(finals[_idx(0.95)]), 2),
 
-        # Full distribution
-        "p5_final":          float(finals[_idx(0.05)]),
-        "p25_final":         float(finals[_idx(0.25)]),
-        "p75_final":         float(finals[_idx(0.75)]),
-        "p95_final":         float(finals[_idx(0.95)]),
-        "worst_5pct_return": float(returns_pct[_idx(0.05)]),
-        "best_5pct_return":  float(returns_pct[_idx(0.95)]),
+        # Path-dependent risk (the real value of shuffling)
+        "median_min_equity": round(float(mins[n // 2]), 2),
+        "p5_min_equity":     round(float(mins[_idx(0.05)]), 2),
+        "p95_min_equity":    round(float(mins[_idx(0.95)]), 2),
 
-        # Risk summary
-        "prob_loss_pct":     round(prob_loss,   1),
+        # Probabilities
+        "prob_loss_pct":     round(prob_loss, 1),
         "prob_profit_pct":   round(prob_profit, 1),
+        "prob_ruin_pct":     round(prob_ruin, 1),
         "passed":            passed,
 
-        # Trade analytics
+        # Trade stats
         "win_rate_pct":      round(win_rate * 100, 1),
-        "avg_win_pct":       round(avg_win,         2),
-        "avg_loss_pct":      round(-avg_loss,        2),   # shown as negative
-        "payoff_ratio":      round(payoff,            2),
-        "kelly_full_pct":    round(kelly * 100,       1),
-        "kelly_half_pct":    round(kelly * 50,        1),  # recommended bet size
+        "avg_win_pct":       round(avg_win, 2),
+        "avg_loss_pct":      round(-avg_loss, 2),
+        "payoff_ratio":      round(payoff, 2),
+        "kelly_half_pct":    round(kelly * 50, 1),
     }
 
 
@@ -156,19 +140,13 @@ def monte_carlo_test(
 
 def monte_carlo_max_drawdown(
     trade_returns:   list[float],
-    simulations:     int   = 2_000,
+    simulations:     int   = 10_000,
     initial_capital: float = 10_000.0,
     seed:            Optional[int] = None,
 ) -> dict:
     """
-    Estimate the distribution of maximum drawdowns across shuffled paths.
-
-    This reveals the worst realistic scenario for the strategy regardless
-    of the particular order trades occurred historically.
-
-    Returns
-    -------
-    dict with drawdown percentiles (all values are negative percentages).
+    Vectorized max drawdown simulation across shuffled paths.
+    Returns distribution of worst drawdown seen in each path.
     """
     if not trade_returns or len(trade_returns) < 3:
         return {"error": "Need ≥ 3 trades for drawdown simulation"}
@@ -176,37 +154,30 @@ def monte_carlo_max_drawdown(
     rng = np.random.default_rng(seed)
     arr = np.asarray(trade_returns, dtype=float)
 
-    mdd_list: list[float] = []
+    shuffled = np.stack([rng.permutation(arr) for _ in range(simulations)])
+    multipliers = 1.0 + shuffled / 100.0
+    equity_paths = initial_capital * np.cumprod(multipliers, axis=1)
 
-    for _ in range(simulations):
-        path   = rng.permutation(arr)
-        equity = initial_capital
-        peak   = initial_capital
-        mdd    = 0.0
-        for r in path:
-            equity *= (1.0 + r / 100.0)
-            if equity > peak:
-                peak = equity
-            dd = (equity - peak) / peak * 100.0
-            if dd < mdd:
-                mdd = dd
-        mdd_list.append(mdd)
+    peaks = np.maximum.accumulate(equity_paths, axis=1)
+    drawdowns = (equity_paths - peaks) / peaks * 100.0
+    mdd_per_path = np.min(drawdowns, axis=1)
 
-    mdd_arr = np.sort(mdd_list)
-    n       = len(mdd_arr)
+    mdd_arr = np.sort(mdd_per_path)
+    n = len(mdd_arr)
 
-    def _idx(pct: float) -> int:
-        return int(np.clip(n * pct, 0, n - 1))
+    def _idx(p: float) -> int:
+        return int(np.clip(n * p, 0, n - 1))
 
     return {
         "simulations":    simulations,
-        "median_mdd_pct": round(float(mdd_arr[n // 2]),          2),
-        "p5_mdd_pct":     round(float(mdd_arr[_idx(0.05)]),      2),   # best 5%
-        "p25_mdd_pct":    round(float(mdd_arr[_idx(0.25)]),      2),
-        "p75_mdd_pct":    round(float(mdd_arr[_idx(0.75)]),      2),
-        "p95_mdd_pct":    round(float(mdd_arr[_idx(0.95)]),      2),   # near-worst
-        "worst_mdd_pct":  round(float(mdd_arr[-1]),               2),
+        "median_mdd_pct": round(float(mdd_arr[n // 2]), 2),
+        "p5_mdd_pct":     round(float(mdd_arr[_idx(0.05)]), 2),
+        "p25_mdd_pct":    round(float(mdd_arr[_idx(0.25)]), 2),
+        "p75_mdd_pct":    round(float(mdd_arr[_idx(0.75)]), 2),
+        "p95_mdd_pct":    round(float(mdd_arr[_idx(0.95)]), 2),
+        "worst_mdd_pct":  round(float(mdd_arr[-1]), 2),
     }
+
 
 
 # ── Helper: extract trade returns from backtester output ─────────────────────
@@ -245,17 +216,11 @@ def extract_trade_returns(trades: list[dict]) -> list[float]:
 
 def print_monte_carlo_report(mc: dict, dd: Optional[dict] = None) -> None:
     """
-    Print a formatted Monte Carlo report via the project logger.
-    Called from main.py after monte_carlo_test() completes.
+    Pretty-printed Monte Carlo report using project logger style.
     """
-    from utils.logger import logger
-
     logger.info(SEP)
     logger.info("  MONTE CARLO ROBUSTNESS TEST")
-    logger.info(
-        f"  {mc.get('simulations', 0):,} shuffled paths  ×  "
-        f"{mc.get('n_trades', 0)} trades per path"
-    )
+    logger.info(f"  {mc.get('simulations', 0):,} shuffled paths × {mc.get('n_trades', 0)} trades")
     logger.info("  Ref: Ahmed (2023) arXiv:2309.09094 | Wang et al. (2026)")
     logger.info(SEP)
 
@@ -269,70 +234,40 @@ def print_monte_carlo_report(mc: dict, dd: Optional[dict] = None) -> None:
     logger.info(f"  {'Initial Capital':<34} ${ic:>12,.2f}")
     logger.info(SEP2)
 
-    # ── Central tendency ──────────────────────────────────────────────────────
-    logger.info(
-        f"  {'Median Final Equity':<34} ${mc['median_final']:>12,.2f}"
-        f"  ({mc['median_return_pct']:>+.1f}%)"
-    )
-    logger.info(
-        f"  {'Mean Final Equity':<34} ${mc['mean_final']:>12,.2f}"
-        f"  ({mc['mean_return_pct']:>+.1f}%)"
-    )
+    # Final equity (order-independent)
+    logger.info(f"  {'Median Final Equity':<34} ${mc['median_final']:>12,.2f}")
+    logger.info(f"  {'Mean Final Equity':<34} ${mc['mean_final']:>12,.2f}")
     logger.info(SEP2)
 
-    # ── Distribution ──────────────────────────────────────────────────────────
-    logger.info("  Equity Distribution Across Paths")
-    logger.info(
-        f"  {'  5th pct  (near-worst outcome)':<34} ${mc['p5_final']:>12,.2f}"
-        f"  ({mc['worst_5pct_return']:>+.1f}%)"
-    )
-    logger.info(f"  {'  25th pct':<34} ${mc['p25_final']:>12,.2f}")
-    logger.info(f"  {'  75th pct':<34} ${mc['p75_final']:>12,.2f}")
-    logger.info(
-        f"  {'  95th pct  (near-best outcome)':<34} ${mc['p95_final']:>12,.2f}"
-        f"  ({mc['best_5pct_return']:>+.1f}%)"
-    )
+    # Path-dependent risk (the real insight)
+    logger.info("  Path-Dependent Risk (varies with trade order)")
+    logger.info(f"  {'Median Minimum Equity':<34} ${mc['median_min_equity']:>12,.2f}")
+    logger.info(f"  {'5th pct Minimum Equity (near-worst)':<34} ${mc['p5_min_equity']:>12,.2f}")
+    logger.info(f"  {'95th pct Minimum Equity (near-best)':<34} ${mc['p95_min_equity']:>12,.2f}")
     logger.info(SEP2)
 
-    # ── Probability summary ───────────────────────────────────────────────────
-    prob_note = (
-        "  [favorable]"   if mc["prob_profit_pct"] >= 65 else
-        "  [marginal]"    if mc["prob_profit_pct"] >= 50 else
-        "  [unfavorable]"
-    )
-    logger.info(
-        f"  {'P(profitable outcome)':<34} {mc['prob_profit_pct']:>12.1f}%{prob_note}"
-    )
-    logger.info(
-        f"  {'P(losing outcome)':<34} {mc['prob_loss_pct']:>12.1f}%"
-    )
+    logger.info("  Probability Summary")
+    logger.info(f"  {'P(profitable outcome)':<34} {mc['prob_profit_pct']:>12.1f}%")
+    logger.info(f"  {'P(loss)':<34} {mc['prob_loss_pct']:>12.1f}%")
+    logger.info(f"  {'P(ruin ≤ $0)':<34} {mc['prob_ruin_pct']:>12.1f}%")
     logger.info(SEP2)
 
-    # ── Trade analytics ───────────────────────────────────────────────────────
-    logger.info("  Trade Analytics (from observed trade list)")
-    logger.info(f"  {'  Win Rate':<34} {mc['win_rate_pct']:>12.1f}%")
-    logger.info(f"  {'  Average Win':<34} {mc['avg_win_pct']:>+12.2f}%")
-    logger.info(f"  {'  Average Loss':<34} {mc['avg_loss_pct']:>+12.2f}%")
-    logger.info(f"  {'  Payoff Ratio':<34} {mc['payoff_ratio']:>12.2f}x")
-    logger.info(
-        f"  {'  Half-Kelly (recommended size)':<34} {mc['kelly_half_pct']:>12.1f}%"
-        "  of capital per trade"
-    )
+    logger.info("  Trade Analytics")
+    logger.info(f"  {'Win Rate':<34} {mc['win_rate_pct']:>12.1f}%")
+    logger.info(f"  {'Average Win':<34} {mc['avg_win_pct']:>+12.2f}%")
+    logger.info(f"  {'Average Loss':<34} {mc['avg_loss_pct']:>+12.2f}%")
+    logger.info(f"  {'Payoff Ratio':<34} {mc['payoff_ratio']:>12.2f}x")
+    logger.info(f"  {'Half-Kelly (recommended)':<34} {mc['kelly_half_pct']:>12.1f}% of capital")
     logger.info(SEP2)
 
-    # ── Drawdown distribution ─────────────────────────────────────────────────
+    # Drawdown distribution (if provided)
     if dd and "error" not in dd:
-        logger.info("  Max Drawdown Distribution (shuffled paths)")
-        logger.info(f"  {'  Median Max Drawdown':<34} {dd['median_mdd_pct']:>12.1f}%")
-        logger.info(
-            f"  {'  95th pct MDD  (near-worst)':<34} {dd['p95_mdd_pct']:>12.1f}%"
-        )
-        logger.info(
-            f"  {'  Absolute Worst MDD seen':<34} {dd['worst_mdd_pct']:>12.1f}%"
-        )
+        logger.info("  Max Drawdown Distribution")
+        logger.info(f"  {'Median Max DD':<34} {dd['median_mdd_pct']:>12.1f}%")
+        logger.info(f"  {'95th pct Max DD (near-worst)':<34} {dd['p95_mdd_pct']:>12.1f}%")
+        logger.info(f"  {'Absolute Worst DD':<34} {dd['worst_mdd_pct']:>12.1f}%")
         logger.info(SEP2)
 
-    # ── Grade ─────────────────────────────────────────────────────────────────
-    grade = "PASS  [robust]" if mc["passed"] else "FAIL  [review strategy edge]"
+    grade = "PASS  [robust]" if mc.get("passed", False) else "FAIL  [review strategy edge]"
     logger.info(f"  MC Grade: {grade}")
     logger.info(SEP)

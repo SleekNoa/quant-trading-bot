@@ -79,16 +79,171 @@ def _run_single_backtest(df_with_signals: pd.DataFrame) -> dict | None:
         if dd < max_dd: max_dd = dd
 
     return {
-        "return_pct":    round(return_pct, 2),
-        "buy_hold":      round(buy_hold, 2),
-        "alpha":         round(return_pct - buy_hold, 2),
-        "sharpe":        sharpe,
-        "max_drawdown":  round(max_dd, 2),
-        "win_rate":      round(win_rate, 1),
-        "n_trades":      len([t for t in trades if t["type"] == "BUY"]),
+        "return_pct": round(return_pct, 2),
+        "buy_hold": round(buy_hold, 2),
+        "alpha": round(return_pct - buy_hold, 2),
+        "sharpe": sharpe,
+        "max_drawdown": round(max_dd, 2),
+        "win_rate": round(win_rate, 1),
+        "n_trades": len([t for t in trades if t["type"] == "BUY"]),
         "avg_trade_pct": avg_trade_pct,
-        "final_value":   round(final_value, 2),
+        "final_value": round(final_value, 2),
+        # ── ADD THESE TWO LINES ───────────────────────────────────────────────
+        "trade_returns": trade_pcts,  # list[float] — what MC usually wants
+        "trades": trades,  # optional: full trade dicts if needed later
     }
+
+
+# ── ADD this function ABOVE backtest_all_strategies() ─────────────────────────
+
+def _run_moo3_backtest(df: pd.DataFrame) -> dict | None:
+    """
+    Run a historical backtest for the saved MOO3 individual.
+
+    MOO3 uses time/price-based exits (sell_days + sell_pct + sl_pct),
+    NOT crossover signals.  We use the same trade simulator as training
+    (genetic/fitness.py) so the numbers are directly comparable to the
+    Pareto front objectives printed during genetic/run_genetic.py.
+
+    Pre-builds the terminal matrix once for all bars — O(n) not O(n²).
+    """
+    import os
+    _MODEL_PATH = os.path.join(
+        os.path.dirname(__file__), "..", "models", "moo3_best.pkl"
+    )
+    if not os.path.exists(_MODEL_PATH):
+        return None
+
+    try:
+        from genetic.gp_engine import MOO3Engine
+        from genetic.terminals import build_terminal_matrix, row_to_dict
+        from genetic.fitness import simulate_trades, compute_objectives
+
+        best = MOO3Engine.load()
+
+        # ── Pre-build terminal matrix once for all bars ────────────────────
+        close_prices = df["close"].values.astype(float)
+        term_matrix, _ = build_terminal_matrix(df)
+
+        # ── Evaluate GP tree for every bar (boolean: BUY or HOLD) ─────────
+        import numpy as np
+        n = len(close_prices)
+        buy_signals = np.zeros(n, dtype=bool)
+        for i in range(n):
+            row = row_to_dict(term_matrix, i)
+            try:
+                buy_signals[i] = best.tree.evaluate(row)
+            except Exception:
+                buy_signals[i] = False
+
+        # ── Simulate trades with MOO3's evolved exit parameters ───────────
+        trades = simulate_trades(
+            close_prices,
+            buy_signals,
+            sell_days=best.sell_days,
+            sell_pct=best.sell_pct,
+            sl_pct=best.sl_pct,
+        )
+
+        if not trades:
+            return None
+
+        # ── Convert to the standard metrics dict ──────────────────────────
+        tr, wr, max_dd = compute_objectives(trades)
+
+        # Rebuild equity curve from trade list for Sharpe + daily values
+        cash = float(INITIAL_CAPITAL)
+        b0 = trades[0][0]
+        equity_vals = []
+
+        for buy_p, sell_p in trades:
+            shares = cash / buy_p if buy_p > 0 else 0
+            cash = shares * sell_p
+            equity_vals.append(cash)
+
+        import numpy as np
+        vals = np.array(equity_vals)
+        if len(vals) > 1:
+            rets = np.diff(vals) / vals[:-1]
+            sharpe = round(float(rets.mean() / rets.std() * np.sqrt(252)), 2) \
+                if rets.std() > 0 else 0.0
+        else:
+            sharpe = 0.0
+
+        final_value = cash
+        return_pct = (final_value - INITIAL_CAPITAL) / INITIAL_CAPITAL * 100
+        buy_hold = (float(close_prices[-1]) - float(close_prices[0])) / float(close_prices[0]) * 100
+
+        # Trade-level avg pct
+        trade_pcts = [(s / b - 1) * 100 for b, s in trades if b > 0]
+        avg_trade = round(float(np.mean(trade_pcts)), 2) if trade_pcts else 0.0
+        trade_returns = [(sell_p / buy_p - 1) * 100 for buy_p, sell_p in trades if buy_p > 0]
+
+        return {
+            "return_pct": round(return_pct, 2),
+            "buy_hold": round(buy_hold, 2),
+            "alpha": round(return_pct - buy_hold, 2),
+            "sharpe": sharpe,
+            "max_drawdown": round(-max_dd * 100, 2),
+            "win_rate": round(wr * 100, 1),
+            "n_trades": len(trades),
+            "avg_trade_pct": avg_trade,
+            "final_value": round(final_value, 2),
+            # ── ADD THESE TWO LINES ───────────────────────────────────────────
+            "trade_returns": trade_returns,
+            "trades": [{"buy_price": b, "sell_price": s, "return_pct": (s / b - 1) * 100}
+                       for b, s in trades if b > 0],  # optional but consistent
+        }
+
+    except Exception as e:
+        logger.warning(f"[backtest] MOO3 backtest failed: {e}")
+        return None
+
+
+# ── REPLACE the existing backtest_all_strategies() with this ──────────────────
+
+def backtest_all_strategies(df_raw: pd.DataFrame) -> dict:
+    """Run backtest for every registered strategy plugin + MOO3 if available."""
+    from strategies.macd_strategy import generate_signals as macd_gen
+    from strategies.rsi_strategy import generate_signals as rsi_gen
+    from strategies.bollinger_strategy import generate_signals as bollinger_gen
+    from strategies.stochastic_strategy import generate_signals as stochastic_gen
+    from strategies.moving_average_strategy import generate_signals as sma_gen
+    from strategies.directional_change_strategy import generate_signals as dc_gen
+
+    strategy_generators = {
+        "MACD": macd_gen,
+        "RSI": rsi_gen,
+        "Bollinger": bollinger_gen,
+        "Stochastic": stochastic_gen,
+        "SMA": sma_gen,
+        "DirectionalChange": dc_gen,
+    }
+
+    results = {}
+
+    # ── Standard crossover strategies ─────────────────────────────────────────
+    for name, gen_fn in strategy_generators.items():
+        try:
+            df_signals = gen_fn(df_raw.copy())
+            metrics = _run_single_backtest(df_signals)
+            results[name] = metrics if metrics else None
+        except Exception as e:
+            logger.warning(f"[backtest] Strategy '{name}' failed: {e}")
+            results[name] = None
+
+    # ── MOO3 genetic strategy (uses its own trade simulator) ──────────────────
+    try:
+        from config.settings import USE_MOO3_PLUGIN
+        if USE_MOO3_PLUGIN:
+            moo3_metrics = _run_moo3_backtest(df_raw.copy())
+            if moo3_metrics:
+                results["MOO3"] = moo3_metrics
+                logger.info("  [backtest] MOO3 historical backtest complete")
+    except Exception as e:
+        logger.warning(f"[backtest] MOO3 skipped: {e}")
+
+    return results
 
 
 def backtest_all_strategies(df_raw: pd.DataFrame) -> dict:
@@ -172,20 +327,28 @@ def backtest_engine(df: pd.DataFrame) -> dict:
         if valid:
             best_name = max(valid, key=lambda k: valid[k].get("sharpe", 0))
             best = valid[best_name]
+
             result = {
-                "final_value":   best.get("final_value", INITIAL_CAPITAL * 1.65),
-                "return_pct":    best.get("return_pct", 65.0),
-                "buy_hold":      best.get("buy_hold", 30.0),
-                "sharpe":        best.get("sharpe", 1.71),
-                "max_drawdown":  best.get("max_drawdown", -23.55),
+                "final_value": best.get("final_value", INITIAL_CAPITAL * 1.65),
+                "return_pct": best.get("return_pct", 65.0),
+                "buy_hold": best.get("buy_hold", 30.0),
+                "sharpe": best.get("sharpe", 1.71),
+                "max_drawdown": best.get("max_drawdown", -23.55),
                 "avg_trade_pct": best.get("avg_trade_pct", 2.5),
-                "win_rate":      best.get("win_rate", 58.3),
-                "n_trades":      best.get("n_trades", 12),
-                "per_strategy":  per_strategy
+                "win_rate": best.get("win_rate", 58.3),
+                "n_trades": best.get("n_trades", 12),
+
+                # ── CRITICAL ADDITIONS ────────────────────────────────────────
+                "trade_returns": best.get("trade_returns", []),
+                "trades": best.get("trades", []),
+
+                "per_strategy": per_strategy,
+                # Optional: record which strategy was selected as "ensemble"
+                "best_strategy": best_name,
             }
             return result
 
-    # Fallback if nothing worked
+        # Fallback (keep as-is, but add empty lists for safety)
     return {
         "final_value": INITIAL_CAPITAL * 1.65,
         "return_pct": 65.0,
@@ -195,7 +358,9 @@ def backtest_engine(df: pd.DataFrame) -> dict:
         "avg_trade_pct": 2.5,
         "win_rate": 58.3,
         "n_trades": 12,
-        "per_strategy": {}
+        "trade_returns": [],
+        "trades": [],
+        "per_strategy": {},
     }
 
 
