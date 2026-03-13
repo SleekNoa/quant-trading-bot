@@ -161,6 +161,9 @@ def walk_forward_test(
 def summarize_walk_forward(results: list[dict]) -> dict:
     """Aggregate per-fold results into a single summary dict."""
     valid = [r for r in results if "error" not in r]
+    # Exclude 0-trade folds from return/Sharpe/win-rate aggregation
+    # They represent periods with no signal, not strategy failures
+    traded = [r for r in valid if r.get("n_trades", 0) > 0]
 
     if not valid:
         return {
@@ -169,41 +172,40 @@ def summarize_walk_forward(results: list[dict]) -> dict:
             "error":       "All walk-forward folds failed — check strategy_func and data quality",
         }
 
-    returns    = [r.get("return_pct",   0.0) for r in valid]
-    sharpes    = [r.get("sharpe",       0.0) for r in valid]
-    drawdowns  = [r.get("max_drawdown", 0.0) for r in valid]
-    win_rates  = [r.get("win_rate",     0.0) for r in valid]
-    trade_cnts = [r.get("n_trades",       0) for r in valid]
+    # Use traded folds for performance metrics, all valid folds for fold counts
+    agg = traded if traded else valid
 
-    profitable     = sum(1 for r in returns if r > 0)
-    fold_win_rate  = profitable / len(valid) * 100
+    returns    = [r.get("return_pct",   0.0) for r in agg]
+    sharpes    = [r.get("sharpe",       0.0) for r in agg]
+    drawdowns  = [r.get("max_drawdown", 0.0) for r in agg]
+    win_rates  = [r.get("win_rate",     0.0) for r in agg]
+    trade_cnts = [r.get("n_trades",       0) for r in valid]  # all folds for total count
+
+    profitable    = sum(1 for r in returns if r > 0)
+    fold_win_rate = profitable / len(agg) * 100 if agg else 0.0
 
     return {
-        # Fold counts
         "folds":              len(results),
         "valid_folds":        len(valid),
+        "traded_folds":       len(traded),
         "profitable_folds":   profitable,
         "fold_win_rate_pct":  round(fold_win_rate, 1),
 
-        # Return distribution
-        "mean_return_pct":    round(float(np.mean(returns)),   2),
-        "median_return_pct":  round(float(np.median(returns)), 2),
-        "std_return_pct":     round(float(np.std(returns)),    2),
-        "best_fold_pct":      round(float(np.max(returns)),    2),
-        "worst_fold_pct":     round(float(np.min(returns)),    2),
+        "mean_return_pct":    round(float(np.mean(returns)),   2) if returns else 0.0,
+        "median_return_pct":  round(float(np.median(returns)), 2) if returns else 0.0,
+        "std_return_pct":     round(float(np.std(returns)),    2) if returns else 0.0,
+        "best_fold_pct":      round(float(np.max(returns)),    2) if returns else 0.0,
+        "worst_fold_pct":     round(float(np.min(returns)),    2) if returns else 0.0,
 
-        # Sharpe
-        "mean_sharpe":        round(float(np.mean(sharpes)),   2),
-        "median_sharpe":      round(float(np.median(sharpes)), 2),
+        "mean_sharpe":        round(float(np.mean(sharpes)),   2) if sharpes else 0.0,
+        "median_sharpe":      round(float(np.median(sharpes)), 2) if sharpes else 0.0,
 
-        # Drawdown
-        "mean_drawdown_pct":  round(float(np.mean(drawdowns)), 2),
-        "worst_drawdown_pct": round(float(np.min(drawdowns)),  2),
+        "mean_drawdown_pct":  round(float(np.mean(drawdowns)), 2) if drawdowns else 0.0,
+        "worst_drawdown_pct": round(float(np.min(drawdowns)),  2) if drawdowns else 0.0,
 
-        # Trades
-        "mean_win_rate_pct":      round(float(np.mean(win_rates)), 1),
-        "total_trades":           int(sum(trade_cnts)),
-        "mean_trades_per_fold":   round(float(np.mean(trade_cnts)), 1),
+        "mean_win_rate_pct":     round(float(np.mean(win_rates)), 1) if win_rates else 0.0,
+        "total_trades":          int(sum(trade_cnts)),
+        "mean_trades_per_fold":  round(float(np.mean(trade_cnts)), 1) if trade_cnts else 0.0,
     }
 
 
@@ -220,6 +222,14 @@ def print_walk_forward_report(results: list[dict], summary: dict) -> None:
     logger.info("  WALK-FORWARD VALIDATION  (out-of-sample only)")
     logger.info("  Ref: Deep et al. (2025) arXiv:2512.12924")
     logger.info(SEP)
+
+    # ── Internal helpers ───────────────────────────────────────────────────────────
+
+    def _fmt_val(val, fmt, suffix="", zero_trades=False):
+        """Format a metric value, showing N/A when there were no trades."""
+        if zero_trades or val is None:
+            return "   N/A"
+        return f"{val:{fmt}}{suffix}"
 
     # ── Error guard ───────────────────────────────────────────────────────────
     if "error" in summary and summary.get("valid_folds", 0) == 0:
@@ -242,12 +252,13 @@ def print_walk_forward_report(results: list[dict], summary: dict) -> None:
             )
             continue
 
-        test_dt  = _fmt_date(r.get("test_start"))
-        ret_s    = f"{r.get('return_pct',   0.0):+.1f}%"
-        sharpe_s = f"{r.get('sharpe',       0.0):.2f}"
-        dd_s     = f"{r.get('max_drawdown', 0.0):.1f}%"
-        wr_s     = f"{r.get('win_rate',     0.0):.1f}%"
-        tr_s     = str(r.get("n_trades", 0))
+        no_trades = r.get("n_trades", 0) == 0
+        test_dt = _fmt_date(r.get("test_start"))
+        ret_s = _fmt_val(r.get("return_pct"), "+.1f", "%", no_trades)
+        sharpe_s = _fmt_val(r.get("sharpe"), ".2f", "", no_trades)
+        dd_s = _fmt_val(r.get("max_drawdown"), ".1f", "%", no_trades)
+        wr_s = _fmt_val(r.get("win_rate"), ".1f", "%", no_trades)
+        tr_s = str(r.get("n_trades", 0))
 
         logger.info(
             f"  {r['fold']:<5}  {test_dt:<12}  {ret_s:>8}  "
@@ -260,8 +271,8 @@ def print_walk_forward_report(results: list[dict], summary: dict) -> None:
     s = summary
 
     logger.info(
-        f"  {'Folds (valid / total)':<32} "
-        f"{s['valid_folds']} / {s['folds']}"
+        f"  {'Folds (valid / traded / total)':<32} "
+        f"{s['valid_folds']} / {s.get('traded_folds', s['valid_folds'])} / {s['folds']}"
     )
     logger.info(
         f"  {'Profitable folds':<32} "

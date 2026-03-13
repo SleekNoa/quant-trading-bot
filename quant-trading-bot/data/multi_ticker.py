@@ -1,54 +1,38 @@
 """
-Multi-Ticker Data Fetcher
-==========================
-Fetches and caches historical OHLCV data for multiple tickers while
-respecting API rate limits (Alpha Vantage: ≤ 5 req/min on free tier,
-yfinance: no hard limit but polite delay is good practice).
+data/multi_ticker.py — Multi-Ticker Data Fetcher
+==================================================
+Fetches historical OHLCV data for multiple tickers while respecting
+API rate limits.
 
-Architecture
-------------
-    fetch_all_tickers(tickers, ...)  →  dict[str, pd.DataFrame]
-    fetch_ticker_safe(ticker, ...)   →  pd.DataFrame | None    (single)
-
-The fetcher delegates to the project's existing get_historical_data()
-function.  It passes the ticker as a ``symbol`` keyword argument so it
-works with both:
-    • The Alpha Vantage-based market_data.py  (uses SYMBOL config)
-    • The yfinance-based market_data.py       (accepts symbol kwarg)
-
-Rate limiting
--------------
-    delay_sec = 13.0   →  ≤4.6 requests/min  (well within the 5/min cap)
-    The delay is injected between calls, not before the first call.
-
-Usage
------
-    from data.multi_ticker import fetch_all_tickers
-    data = fetch_all_tickers(["AAPL", "MSFT", "SPY"])
-    for ticker, df in data.items():
-        print(f"{ticker}: {len(df)} bars")
+Simulated / stale data is rejected: any ticker whose last bar is older
+than STALENESS_THRESHOLD_DAYS is treated as a failed fetch and excluded
+from results. This prevents synthetic fallback data from contaminating
+signal rankings.
 """
 
 from __future__ import annotations
 
 import time
 import pandas as pd
+from datetime import datetime, timedelta
 from typing import Optional
 
 from utils.logger import logger
+
+# Simulated fallback data always ends 2023-05-17 (~1000 days ago).
+# Any ticker whose last bar is older than this threshold is rejected.
+_STALENESS_DAYS = 90
 
 
 # ── Single-ticker safe fetch ───────────────────────────────────────────────────
 
 def fetch_ticker_safe(
-    ticker:    str,
-    min_bars:  int = 50,
+    ticker:   str,
+    min_bars: int = 50,
 ) -> Optional[pd.DataFrame]:
     """
     Fetch historical data for one ticker.
-
-    Relies on get_historical_data(symbol=...) which now supports passing the ticker.
-    Returns None if fetch fails or too few bars.
+    Returns None if fetch fails, too few bars, or data is stale/simulated.
     """
     from data.market_data import get_historical_data
 
@@ -63,13 +47,21 @@ def fetch_ticker_safe(
             )
             return None
 
+        # Reject simulated/stale data — last bar must be within 90 days
+        last_date = pd.Timestamp(df.index[-1]).to_pydatetime().replace(tzinfo=None)
+        cutoff    = datetime.now() - timedelta(days=_STALENESS_DAYS)
+        if last_date < cutoff:
+            logger.warning(
+                f"           {ticker}: skipped — last bar {last_date.date()} "
+                f"is stale (simulated fallback or delisted)"
+            )
+            return None
+
         return df
 
     except Exception as exc:
         logger.error(f"           {ticker}: fetch failed — {exc}")
         return None
-
-    return df
 
 
 # ── Multi-ticker batch fetch ───────────────────────────────────────────────────
@@ -81,28 +73,26 @@ def fetch_all_tickers(
 ) -> dict[str, pd.DataFrame]:
     """
     Fetch historical data for every ticker in the list.
+    Only tickers with real, recent data are included in the result.
 
     Parameters
     ----------
-    tickers   : list of symbol strings, e.g. ["SPY", "QQQ", "AAPL"]
-    delay_sec : pause between successive API calls (seconds).
-                Default 13 s keeps Alpha Vantage well under 5 req/min.
-    min_bars  : minimum bars required to include a ticker in the result
+    tickers   : list of symbol strings
+    delay_sec : pause between successive API calls (seconds)
+    min_bars  : minimum bars required to include a ticker
 
     Returns
     -------
-    dict  { ticker: DataFrame }  — only successfully loaded tickers included
-
-    Notes
-    -----
-    Progress is logged via utils.logger at INFO level.
-    Failures are logged as ERROR but do not raise — the caller receives
-    whatever tickers loaded successfully.
+    dict { ticker: DataFrame } — successfully loaded tickers only
     """
     result: dict[str, pd.DataFrame] = {}
-    total = len(tickers)
+    total  = len(tickers)
+    n_fail = 0
 
-    logger.info(f"           Multi-ticker scan: {total} ticker(s) — delay {delay_sec}s between calls")
+    logger.info(
+        f"           Multi-ticker scan: {total} ticker(s) "
+        f"— delay {delay_sec}s between calls"
+    )
 
     for i, ticker in enumerate(tickers):
         logger.info(f"           [{i + 1}/{total}] Fetching {ticker}...")
@@ -111,16 +101,16 @@ def fetch_all_tickers(
 
         if df is not None:
             result[ticker] = df
-            start_dt = df.index[0].strftime("%Y-%m-%d") if hasattr(df.index[0], "strftime") else str(df.index[0])
-            end_dt   = df.index[-1].strftime("%Y-%m-%d") if hasattr(df.index[-1], "strftime") else str(df.index[-1])
+            start_dt = df.index[0].strftime("%Y-%m-%d")
+            end_dt   = df.index[-1].strftime("%Y-%m-%d")
             logger.info(f"           {ticker}: {len(df)} bars  ({start_dt} → {end_dt})")
+        else:
+            n_fail += 1
 
-        # Rate-limit delay between calls (not after the last one)
         if i < total - 1:
             time.sleep(delay_sec)
 
     n_ok = len(result)
-    n_fail = total - n_ok
     logger.info(
         f"           Multi-ticker complete: "
         f"{n_ok} loaded, {n_fail} skipped/failed"

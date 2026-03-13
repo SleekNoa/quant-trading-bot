@@ -43,6 +43,11 @@ Usage
 
 from __future__ import annotations
 
+from config.settings import (
+    PROB_BUY_THRESHOLD,     # e.g. 60   → means 0.60
+    PROB_SELL_THRESHOLD,    # e.g. 45   → means 0.45
+)
+
 import numpy as np
 import pandas as pd
 
@@ -80,8 +85,8 @@ class LogisticProbabilityModel:
     def __init__(
         self,
         train_bars:      int   = 200,
-        buy_threshold:   float = 0.55,
-        sell_threshold:  float = 0.45,
+        buy_threshold:   float = PROB_BUY_THRESHOLD / 100.0,
+        sell_threshold:  float = PROB_SELL_THRESHOLD / 100.0,
     ):
         """
         Parameters
@@ -120,37 +125,37 @@ class LogisticProbabilityModel:
         close = df["close"].astype(float)
         f = pd.DataFrame(index=df.index)
 
+        # ── Shared vol denominator (used by features 2 and 6) ─────────────────
+        vol_20 = close.pct_change().rolling(20).std().replace(0, np.nan)  # ← ADD THIS LINE
+
         # 1. MA spread (normalised by rolling volatility × price)
         if "short_ma" in df.columns and "long_ma" in df.columns:
-            vol_20 = close.pct_change().rolling(20).std().replace(0, np.nan)
-            denom  = (vol_20 * close).replace(0, np.nan)
+            denom = (vol_20 * close).replace(0, np.nan)
             f["ma_spread"] = (
-                df["short_ma"].astype(float) - df["long_ma"].astype(float)
-            ) / denom
+                                     df["short_ma"].astype(float) - df["long_ma"].astype(float)
+                             ) / denom
         else:
-            # No MA columns — use EMA(10) vs EMA(30) as proxy
             ema_short = close.ewm(span=10, min_periods=10).mean()
-            ema_long  = close.ewm(span=30, min_periods=30).mean()
-            vol_20    = close.pct_change().rolling(20).std().replace(0, np.nan)
-            denom     = (vol_20 * close).replace(0, np.nan)
+            ema_long = close.ewm(span=30, min_periods=30).mean()
+            denom = (vol_20 * close).replace(0, np.nan)
             f["ma_spread"] = (ema_short - ema_long) / denom
 
-        # 2. 5-day price momentum
-        f["momentum_5d"] = close.pct_change(5)
+        # 2. 5-day price momentum  ← CHANGED: divide by vol_20
+        f["momentum_5d"] = close.pct_change(5) / vol_20
 
         # 3. RSI (normalised 0 – 1); computed inline if column absent
         if "rsi" in df.columns:
             f["rsi_norm"] = df["rsi"].astype(float) / 100.0
         else:
             delta = close.diff()
-            gain  = delta.clip(lower=0).ewm(com=13, min_periods=14).mean()
-            loss  = (-delta.clip(upper=0)).ewm(com=13, min_periods=14).mean()
-            rs    = gain / loss.replace(0, np.nan)
+            gain = delta.clip(lower=0).ewm(com=13, min_periods=14).mean()
+            loss = (-delta.clip(upper=0)).ewm(com=13, min_periods=14).mean()
+            rs = gain / loss.replace(0, np.nan)
             f["rsi_norm"] = (100 - 100 / (1 + rs)) / 100.0
 
         # 4. Volume ratio (current bar vs 20-bar mean)
         if "volume" in df.columns:
-            vol_mean       = df["volume"].astype(float).rolling(20).mean().replace(0, np.nan)
+            vol_mean = df["volume"].astype(float).rolling(20).mean().replace(0, np.nan)
             f["volume_ratio"] = df["volume"].astype(float) / vol_mean
         else:
             f["volume_ratio"] = 1.0
@@ -158,14 +163,14 @@ class LogisticProbabilityModel:
         # 5. Close position within 20-bar high/low range
         if "high" in df.columns and "low" in df.columns:
             high_20 = df["high"].astype(float).rolling(20).max()
-            low_20  = df["low"].astype(float).rolling(20).min()
-            rng     = (high_20 - low_20).replace(0, np.nan)
+            low_20 = df["low"].astype(float).rolling(20).min()
+            rng = (high_20 - low_20).replace(0, np.nan)
             f["close_position"] = (close - low_20) / rng
         else:
             f["close_position"] = 0.5
 
-        # 6. Single-bar log return
-        f["bar_return"] = np.log(close / close.shift(1).replace(0, np.nan))
+        # 6. Single-bar log return  ← CHANGED: divide by vol_20
+        f["bar_return"] = np.log(close / close.shift(1).replace(0, np.nan)) / vol_20
 
         return f.dropna()
 

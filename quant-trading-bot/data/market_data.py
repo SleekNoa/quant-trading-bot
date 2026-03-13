@@ -51,7 +51,7 @@ def get_historical_data(symbol: str = None) -> pd.DataFrame:
 
         logger.info(f"✅ yfinance: {len(df):,} fresh bars loaded for {fetch_symbol} "
                     f"({df.index[0].date()} → {df.index[-1].date()})")
-
+        df.attrs["simulated"] = False
         return df
 
     except Exception as e:
@@ -93,4 +93,5 @@ def _simulate() -> pd.DataFrame:
         "1. open": "open", "2. high": "high", "3. low": "low",
         "4. close": "close", "5. volume": "volume"
     })
+    df.attrs["simulated"] = True
     return df

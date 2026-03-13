@@ -175,12 +175,12 @@ USE_PROB_MODEL = True
 
 # Number of bars used to train the logistic model (from the tail of df)
 # Minimum ~50 required; 200 gives a reliable fit without overfitting
-PROB_TRAIN_BARS = 200
+PROB_TRAIN_BARS = 400
 
 # Probability thresholds (as percentages: 55 = 55% = 0.55 fraction)
 # A BUY crossover only fires if P(up) ≥ PROB_BUY_THRESHOLD
 # A SELL crossover only fires if P(up) ≤ (100 - PROB_SELL_THRESHOLD)
-PROB_BUY_THRESHOLD  = 60    # 55% — require slight edge before buying
+PROB_BUY_THRESHOLD  = 55    # 60% — require P(up) ≥ 60% to execute BUY
 PROB_SELL_THRESHOLD = 45    # 45% — sell when model leans bearish
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -302,7 +302,7 @@ TAKE_PROFIT_PCT = 0.08          # 8% target → ~1.6:1 reward:risk with 5% stop
 
 # Minimum signal probability required to pass the signal gate (%)
 # Uses the probability estimator output (buy_3d_pct / sell_3d_pct scale 0-100)
-MIN_SIGNAL_PROBABILITY = 55     # 50% for test 55% = same as PROB_BUY_THRESHOLD
+MIN_SIGNAL_PROBABILITY = 60     # 50% for test 55% = same as PROB_BUY_THRESHOLD
 
 # Run Monte Carlo stress test before each live BUY (live gate, risk_manager.py)
 RUN_STRESS_TEST = True

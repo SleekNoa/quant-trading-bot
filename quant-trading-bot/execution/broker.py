@@ -7,6 +7,9 @@ Fixes vs original:
     3. Sells ACTUAL position qty (not hardcoded 1)
     4. Submits bracket orders with stop-loss when USE_STOP_LOSS=True
     5. Returns structured result dicts for downstream logging
+    6. get_today_activity reads filled orders — not position qty
+    7. sell() uses OrderSide.SELL (was incorrectly OrderSide.BUY)
+    8. sell() no longer references undefined stop_loss_price / price
 """
 
 import os
@@ -31,8 +34,7 @@ except ImportError:
     try:
         import alpaca_trade_api as tradeapi
         ALPACA_PY_AVAILABLE = False
-        logger.warning("[broker] alpaca-py not found — falling back to alpaca-trade-api. "
-                       "Install alpaca-py for best compatibility: pip install alpaca-py")
+        logger.warning("[broker] alpaca-py not found — falling back to alpaca-trade-api.")
     except ImportError:
         ALPACA_PY_AVAILABLE = None
         logger.error("[broker] No Alpaca SDK found. Install: pip install alpaca-py")
@@ -41,7 +43,6 @@ PAPER_BASE_URL = "https://paper-api.alpaca.markets"
 
 
 def _get_client():
-    """Return an Alpaca TradingClient (alpaca-py) or legacy REST client."""
     if ALPACA_PY_AVAILABLE is True:
         return TradingClient(ALPACA_API_KEY, ALPACA_SECRET_KEY, paper=True)
     elif ALPACA_PY_AVAILABLE is False:
@@ -51,86 +52,54 @@ def _get_client():
 
 
 def get_account() -> dict | None:
-    """
-    Return account info: cash, portfolio_value, buying_power.
-    Returns a plain dict regardless of SDK version.
-    """
     client = _get_client()
     if client is None:
         return None
     try:
-        if ALPACA_PY_AVAILABLE:
-            acct = client.get_account()
-            return {
-                "cash":            float(acct.cash),
-                "portfolio_value": float(acct.portfolio_value),
-                "buying_power":    float(acct.buying_power),
-                "equity":          float(acct.equity),
-            }
-        else:
-            acct = client.get_account()
-            return {
-                "cash":            float(acct.cash),
-                "portfolio_value": float(acct.portfolio_value),
-                "buying_power":    float(acct.buying_power),
-                "equity":          float(acct.equity),
-            }
+        acct = client.get_account()
+        return {
+            "cash":            float(acct.cash),
+            "portfolio_value": float(acct.portfolio_value),
+            "buying_power":    float(acct.buying_power),
+            "equity":          float(acct.equity),
+        }
     except Exception as e:
         logger.error(f"[broker] get_account failed: {e}")
         return None
 
 
 def get_position(symbol: str) -> dict | None:
-    """
-    Return current open position for symbol, or None if flat.
-    Returns dict with: qty, avg_entry_price, market_value, unrealized_pl
-    """
     client = _get_client()
     if client is None:
         return None
     try:
         if ALPACA_PY_AVAILABLE:
             pos = client.get_open_position(symbol)
-            return {
-                "qty":             int(float(pos.qty)),
-                "avg_entry_price": float(pos.avg_entry_price),
-                "market_value":    float(pos.market_value),
-                "unrealized_pl":   float(pos.unrealized_pl),
-            }
         else:
             pos = client.get_position(symbol)
-            return {
-                "qty":             int(float(pos.qty)),
-                "avg_entry_price": float(pos.avg_entry_price),
-                "market_value":    float(pos.market_value),
-                "unrealized_pl":   float(pos.unrealized_pl),
-            }
+        return {
+            "qty":             int(float(pos.qty)),
+            "avg_entry_price": float(pos.avg_entry_price),
+            "market_value":    float(pos.market_value),
+            "unrealized_pl":   float(pos.unrealized_pl),
+        }
     except Exception:
-        # Position doesn't exist = we're flat
         return None
 
 
 def buy(symbol: str, qty: int, stop_loss_price: float = None) -> dict | None:
     """
-    Submit a market BUY order.
-
-    If USE_STOP_LOSS is True and stop_loss_price is provided, submits a
-    bracket order with an attached stop-loss leg.
-
-    Guards:
-        - skips if qty <= 0
-        - skips if an open position already exists (prevents double-entry)
+    Submit a market BUY order with optional stop-loss bracket.
+    Guards: skips if qty <= 0 or an open position already exists.
     """
     if qty <= 0:
         logger.warning(f"[broker] Skipping BUY — qty={qty} invalid")
         return None
 
-    # Guard: check for existing position
     existing = get_position(symbol)
     if existing and existing["qty"] > 0:
         logger.warning(
-            f"[broker] Skipping BUY — already holding {existing['qty']}x {symbol}. "
-            f"Close position first or wait for SELL signal."
+            f"[broker] Skipping BUY — already holding {existing['qty']}x {symbol}."
         )
         return None
 
@@ -146,25 +115,23 @@ def buy(symbol: str, qty: int, stop_loss_price: float = None) -> dict | None:
                 side=OrderSide.BUY,
                 time_in_force=TimeInForce.GTC,
             )
-            # Attach stop-loss if configured and price is provided
             if USE_STOP_LOSS and stop_loss_price:
-                order_data.stop_loss = StopLossRequest(stop_price=round(stop_loss_price, 2))
-
+                order_data.stop_loss = StopLossRequest(
+                    stop_price=round(stop_loss_price, 2)
+                )
             order = client.submit_order(order_data)
             order_id = order.id
         else:
-            # Legacy SDK (alpaca-trade-api)
-            kwargs = dict(
-                symbol=symbol, qty=qty, side="buy",
-                type="market", time_in_force="gtc"
-            )
+            kwargs = dict(symbol=symbol, qty=qty, side="buy",
+                          type="market", time_in_force="gtc")
             if USE_STOP_LOSS and stop_loss_price:
                 kwargs["order_class"] = "bracket"
                 kwargs["stop_loss"]   = {"stop_price": round(stop_loss_price, 2)}
             order = client.submit_order(**kwargs)
             order_id = order.id
 
-        stop_note = f" | stop-loss @ ${stop_loss_price:.2f}" if (USE_STOP_LOSS and stop_loss_price) else ""
+        stop_note = (f" | stop-loss @ ${stop_loss_price:.2f}"
+                     if (USE_STOP_LOSS and stop_loss_price) else "")
         logger.info(f"[broker] ✅ BUY  {qty}x {symbol}  submitted{stop_note}  · id: {order_id}")
         return {"order_id": str(order_id), "qty": qty, "symbol": symbol, "side": "buy"}
 
@@ -176,15 +143,12 @@ def buy(symbol: str, qty: int, stop_loss_price: float = None) -> dict | None:
 def sell(symbol: str, qty: int = None) -> dict | None:
     """
     Submit a market SELL order.
-
-    If qty is None (default), sells the ENTIRE current position.
-    This fixes the original bug where only 1 share was ever sold.
+    If qty is None, sells the entire current position.
     """
     client = _get_client()
     if client is None:
         return None
 
-    # Determine qty from actual position if not specified
     if qty is None:
         position = get_position(symbol)
         if position is None or position["qty"] <= 0:
@@ -202,33 +166,16 @@ def sell(symbol: str, qty: int = None) -> dict | None:
             order_data = MarketOrderRequest(
                 symbol=symbol,
                 qty=qty,
-                side=OrderSide.BUY,
+                side=OrderSide.SELL,          # Bug 3 fix: was OrderSide.BUY
                 time_in_force=TimeInForce.GTC,
             )
-
-            bracket_needed = False
-
-            if USE_STOP_LOSS and stop_loss_price:
-                order_data.stop_loss = StopLossRequest(
-                    stop_price=round(stop_loss_price, 2)
-                )
-                bracket_needed = True
-
-            if USE_TAKE_PROFIT:
-                # Approximate take-profit price (use last close or fetch quote for precision)
-                # For simplicity here we use the expected entry ≈ current price
-                # In production: fetch client.get_latest_quote(symbol).ask_price
-                approx_entry = stop_loss_price / (1 - STOP_LOSS_PCT) if stop_loss_price else price  # rough
-                tp_price = round(approx_entry * (1 + TAKE_PROFIT_PCT), 2)
-                order_data.take_profit = TakeProfitRequest(
-                    limit_price=tp_price
-                )
-                bracket_needed = True
-
-            if bracket_needed:
-                order_data.order_class = "bracket"
-
             order = client.submit_order(order_data)
+            order_id = order.id
+        else:
+            order = client.submit_order(
+                symbol=symbol, qty=qty, side="sell",
+                type="market", time_in_force="gtc"
+            )
             order_id = order.id
 
         logger.info(f"[broker] ✅ SELL {qty}x {symbol}  submitted  · id: {order_id}")
@@ -238,14 +185,13 @@ def sell(symbol: str, qty: int = None) -> dict | None:
         logger.error(f"[broker] SELL failed: {e}")
         return None
 
+
 def get_today_activity(symbol: str) -> dict:
     """
-    Check whether we have an open position or pending orders for symbol today.
-    Used by main.py to prevent duplicate BUY execution.
-    Primary guard: get_position() (proven reliable).
-    Secondary: open order scan (best-effort).
+    Return today's fill activity and pending orders for symbol.
+    bought_qty reflects FILLED buy orders today — not held position qty.
     """
-    _zero = {
+    result = {
         "bought_qty":         0,
         "sold_qty":           0,
         "net_qty":            0,
@@ -254,16 +200,11 @@ def get_today_activity(symbol: str) -> dict:
         "has_open_position":  False,
     }
 
-    # ── Primary: open position check ─────────────────────────────────────────
-    position = get_position(symbol)
+    # Open position flag — for reference only, does NOT set bought_qty
+    position     = get_position(symbol)
     has_position = position is not None and position["qty"] > 0
-
-    result = dict(_zero)
     result["has_open_position"] = has_position
-    if has_position:
-        result["bought_qty"] = position["qty"]
 
-    # ── Secondary: open orders scan ───────────────────────────────────────────
     client = _get_client()
     if client is None:
         logger.warning("[broker] get_today_activity: no client")
@@ -279,6 +220,7 @@ def get_today_activity(symbol: str) -> dict:
 
             logger.info(f"[broker] Scanning open orders for {symbol} ({start.date()})")
 
+            # ── Pending orders ────────────────────────────────────────────────
             open_req = GetOrdersRequest(
                 status="open",
                 after=start.isoformat(),
@@ -295,6 +237,23 @@ def get_today_activity(symbol: str) -> dict:
                 if "buy"  in side: result["pending_buy_count"]  += 1
                 if "sell" in side: result["pending_sell_count"] += 1
 
+            # ── Today's filled orders (source of truth for bought_qty) ────────
+            filled_req = GetOrdersRequest(
+                status="closed",
+                after=start.isoformat(),
+                until=end.isoformat(),
+                limit=500,
+            )
+            all_filled = client.get_orders(filled_req)
+
+            for o in all_filled:
+                if str(o.symbol) != symbol:
+                    continue
+                side = str(o.side).lower()
+                qty  = int(float(o.filled_qty or 0))
+                if "buy"  in side: result["bought_qty"] += qty
+                if "sell" in side: result["sold_qty"]   += qty
+
         result["net_qty"] = result["bought_qty"] - result["sold_qty"]
         logger.info(f"[broker] Activity for {symbol}: {result}")
 
@@ -302,6 +261,7 @@ def get_today_activity(symbol: str) -> dict:
         logger.error(f"[broker] get_today_activity scan failed: {e}", exc_info=True)
 
     return result
+
 
 def close_position(symbol: str) -> dict | None:
     """Convenience: close entire position immediately."""

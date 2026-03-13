@@ -43,6 +43,7 @@ Monte Carlo robustness:
 
 import sys
 import os
+import numpy as np
 sys.path.insert(0, os.path.dirname(__file__))
 
 # ── Auto-register all strategy plugins ────────────────────────────────────────
@@ -397,6 +398,14 @@ def run():
     # ── 1. Market Data ─────────────────────────────────────────────────────────
     logger.info("[ 1 / 7 ]  Downloading market data...")
     df = get_historical_data(symbol=active_symbol) if USE_MULTI_TICKER else get_historical_data()
+
+    # Drop any trailing bars where close is NaN — these corrupt all downstream metrics
+    df = df[df["close"].notna()]
+    if df.empty:
+        logger.error("           DataFrame empty after NaN drop — aborting")
+        logger.info(SEP + "\n")
+        return
+
     logger.info(f"           {len(df)} bars loaded ({df.index[0].date()} -> {df.index[-1].date()})")
 
     # ── 2. Compute all indicator columns ──────────────────────────────────────
@@ -418,8 +427,19 @@ def run():
     decision, report = evaluate_strategies(df, regime=regime)
     log_engine_report(report)
 
-    latest      = df.iloc[-1]
-    price       = float(latest["close"])
+    latest = df.iloc[-1]
+    price = float(latest["close"])
+
+    # Guard: last bar sometimes has NaN close (unsettled tick from yfinance).
+    # Walk back through recent bars to find the last valid price.
+    if not np.isfinite(price):
+        valid_closes = df["close"].dropna()
+        if valid_closes.empty:
+            logger.error("           No valid close prices in data — aborting")
+            logger.info(SEP + "\n")
+            return
+        price = float(valid_closes.iloc[-1])
+        logger.warning(f"           Last bar close is NaN — using most recent valid close: ${price:.2f}")
     latest_date = df.index[-1].strftime("%Y-%m-%d")
     logger.info(f"           Date  : {latest_date}   Price : ${price:.2f}")
 
@@ -503,16 +523,14 @@ def run():
 
         # BUY path
         # ── Same-day duplicate guard ──────────────────────────────────────────────
-    from execution.broker import get_today_activity
     activity = get_today_activity(active_symbol)
 
     has_position = activity["has_open_position"]
+    bought_today = activity["bought_qty"] > 0
     pending_buy = activity["pending_buy_count"] > 0
     pending_sell = activity["pending_sell_count"] > 0
 
-    should_prompt = has_position or pending_buy or pending_sell
-
-    if should_prompt:
+    if bought_today or pending_buy:
         logger.warning(
             f"[main] ⚠️  Duplicate guard triggered for {active_symbol}: "
             f"open_position={has_position} | bought_qty={activity['bought_qty']} "

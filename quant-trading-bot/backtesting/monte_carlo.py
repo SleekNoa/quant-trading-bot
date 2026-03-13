@@ -235,8 +235,8 @@ def print_monte_carlo_report(mc: dict, dd: Optional[dict] = None) -> None:
     logger.info(SEP2)
 
     # Final equity (order-independent)
-    logger.info(f"  {'Median Final Equity':<34} ${mc['median_final']:>12,.2f}")
-    logger.info(f"  {'Mean Final Equity':<34} ${mc['mean_final']:>12,.2f}")
+    logger.info(f"  {'Final Equity (all paths)':<34} ${mc['median_final']:>12,.2f}")
+    logger.info(f"  {'  (order-invariant — same for all shuffles)':<34}")
     logger.info(SEP2)
 
     # Path-dependent risk (the real insight)
@@ -263,8 +263,9 @@ def print_monte_carlo_report(mc: dict, dd: Optional[dict] = None) -> None:
     # Drawdown distribution (if provided)
     if dd and "error" not in dd:
         logger.info("  Max Drawdown Distribution")
+        logger.info(f"  {'5th pct Max DD (near-worst)':<34} {dd['p5_mdd_pct']:>12.1f}%")
         logger.info(f"  {'Median Max DD':<34} {dd['median_mdd_pct']:>12.1f}%")
-        logger.info(f"  {'95th pct Max DD (near-worst)':<34} {dd['p95_mdd_pct']:>12.1f}%")
+        logger.info(f"  {'95th pct Max DD (near-best)':<34} {dd['p95_mdd_pct']:>12.1f}%")
         logger.info(f"  {'Absolute Worst DD':<34} {dd['worst_mdd_pct']:>12.1f}%")
         logger.info(SEP2)
 
