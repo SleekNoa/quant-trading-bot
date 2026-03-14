@@ -49,8 +49,8 @@ def get_historical_data(symbol: str = None) -> pd.DataFrame:
         df.columns = ['open', 'high', 'low', 'close', 'volume']
         df.index.name = 'date'
 
-        logger.info(f"✅ yfinance: {len(df):,} fresh bars loaded for {fetch_symbol} "
-                    f"({df.index[0].date()} → {df.index[-1].date()})")
+        logger.info(f"yfinance: {len(df):,} fresh bars loaded for {fetch_symbol} "
+                    f"({df.index[0].date()} -> {df.index[-1].date()})")
         df.attrs["simulated"] = False
         return df
 

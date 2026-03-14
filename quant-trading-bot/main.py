@@ -1,4 +1,4 @@
-"""
+﻿"""
 QuantBot — Self-Evolving Multi-Strategy Paper Trading Bot
 ==========================================================
 Run:
@@ -66,6 +66,7 @@ from strategies.probability_estimator import (
 )
 from backtesting.backtester import backtest_engine, log_per_strategy_report
 from execution.broker import buy, sell, get_account, get_position, get_today_activity
+from execution.exit_monitor import run_exit_monitor
 from risk.risk_manager import (
     calculate_position_size, compute_historical_var, compute_cvar,
     check_drawdown_circuit_breaker, passes_signal_gate,
@@ -90,6 +91,9 @@ from config.settings import (
     MULTI_TICKER_MIN_BARS, MULTI_TICKER_TOP_N, TICKER_ALLOC_METHOD,
     # Strategy
     STRATEGY,
+    # Exit Monitor
+    USE_TRAILING_STOP, TRAILING_STOP_PCT,
+    USE_TIME_EXIT, EXIT_MAX_HOLD_DAYS,
 )
 
 from config.settings import USE_MOO3_PLUGIN, MOO3_PLUGIN_WEIGHT
@@ -165,7 +169,7 @@ def print_risk_dashboard(cash, equity, var, cvar):
     logger.info(f"  {'Max risk/trade':<28} {MAX_RISK_PER_TRADE_PCT*100:>12.1f}%")
     logger.info(f"  {'Drawdown circuit-break':<28} {MAX_PORTFOLIO_DRAWDOWN_PCT*100:>11.0f}%")
     if USE_STOP_LOSS:
-        logger.info(f"  {'Stop-loss':<28} {'ON -'+str(int(STOP_LOSS_PCT*100))+'%':>13}")
+        logger.info(f"  {'Stop-loss':<28} {'ON '+str(int(STOP_LOSS_PCT*100))+'%':>13}")
     else:
         logger.info(f"  {'Stop-loss':<28} {'OFF':>13}")
     logger.info(f"  {'MC stress test':<28} {'ON' if RUN_STRESS_TEST else 'OFF':>13}")
@@ -330,11 +334,11 @@ def run_multi_ticker_scan() -> str:
 
                 # Quick backtest for Sharpe
                 _signals = strategy_func(_df)
-                bt       = backtest(_signals)
+                bt       = backtest(_signals, symbol=ticker, log_trades=False, log_info=False)
 
                 # Probability estimate (reset model per ticker)
                 reset_probability_model()
-                probs = estimate_crossover_probability(_df)
+                probs = estimate_crossover_probability(_df, log_selection=False)
 
                 ticker_results[ticker] = {
                     "decision":   decision,
@@ -377,15 +381,6 @@ def run_multi_ticker_scan() -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run():
-    logger.info(SEP)
-    logger.info(f"  QuantBot  |  {SYMBOL}  |  6-plugin engine")
-    logger.info(f"  Registered strategies: {', '.join(list_strategies())}")
-    logger.info(f"  Prob gate: LogisticModel  |  "
-                f"WF: {'ON' if USE_WALK_FORWARD else 'OFF'}  |  "
-                f"MC: {'ON' if USE_BACKTEST_MC else 'OFF'}  |  "
-                f"Multi-ticker: {'ON' if USE_MULTI_TICKER else 'OFF'}")
-    logger.info(SEP)
-
     # ── [opt] Multi-ticker pre-scan ────────────────────────────────────────────
     # Runs before Phase 1 when USE_MULTI_TICKER is True.
     # Scans TICKERS, ranks signals, returns the best symbol for the pipeline.
@@ -394,6 +389,15 @@ def run():
         logger.info("[M-T]  Multi-ticker scan running before Phase 1...")
         active_symbol = run_multi_ticker_scan()
         logger.info(f"[M-T]  Pipeline will execute on: {active_symbol}")
+
+    logger.info(SEP)
+    logger.info(f"  QuantBot  |  {active_symbol}  |  6-plugin engine")
+    logger.info(f"  Registered strategies: {', '.join(list_strategies())}")
+    logger.info(f"  Prob gate: LogisticModel  |  "
+                f"WF: {'ON' if USE_WALK_FORWARD else 'OFF'}  |  "
+                f"MC: {'ON' if USE_BACKTEST_MC else 'OFF'}  |  "
+                f"Multi-ticker: {'ON' if USE_MULTI_TICKER else 'OFF'}")
+    logger.info(SEP)
 
     # ── 1. Market Data ─────────────────────────────────────────────────────────
     logger.info("[ 1 / 7 ]  Downloading market data...")
@@ -449,7 +453,7 @@ def run():
 
     # ── 5. Engine backtest ────────────────────────────────────────────────────
     logger.info("[ 5 / 7 ]  Running engine backtest...")
-    result = backtest_engine(df)
+    result = backtest_engine(df, symbol=active_symbol)
     print_backtest_header(result, symbol=active_symbol)
     if "per_strategy" in result:
         log_per_strategy_report(result["per_strategy"])
@@ -495,6 +499,17 @@ def run():
         logger.info(SEP + "\n")
         return
 
+        # ── Exit monitor — runs BEFORE engine decision ─────────────────────────────
+        # Checks take-profit, trailing stop, and time-based exit independently of
+        # the strategy engine. Mirrors the sell logic in genetic/fitness.py.
+        # Reference: Long et al. (2026), Section 4.
+    logger.info("[ 6a ]  Exit monitor (take-profit / trailing stop / time-based)...")
+    exited = run_exit_monitor(active_symbol, price, df)
+    if exited:
+        logger.info("           Position closed by exit monitor — skipping engine decision")
+        logger.info(SEP + "\n")
+        return
+
     # No actionable signal
     if decision == "HOLD":
         position = get_position(active_symbol)
@@ -509,14 +524,48 @@ def run():
         return
 
     # Signal quality gate (probability filter from LogisticModel)
-    cross_dir = 1 if decision == "BUY" else -1
+    if decision == "BUY":
+        cross_dir = 1
+    elif decision == "SELL":
+        cross_dir = -1
+    else:
+        logger.info("           Decision not actionable — skipping probability gate")
+        logger.info(SEP + "\n")
+        return
+
     if not passes_signal_gate(probs["buy_3d_pct"], probs["sell_3d_pct"], cross_dir):
         logger.info("           Trade blocked by signal quality gate (logistic probability)")
         logger.info(SEP + "\n")
         return
 
+    # ── SELL path ────────────────────────────────────────────────────────
     if decision == "SELL":
         logger.info("[ 7 / 7 ]  Executing SELL...")
+
+        # Guard: only sell if we actually hold a position
+        position = get_position(active_symbol)
+        if not position or position["qty"] <= 0:
+            logger.warning(
+                f"[risk] SELL rejected — no position open in {active_symbol}"
+            )
+            logger.info(SEP + "\n")
+            return
+
+        # Guard: drawdown check on the position itself
+        if position["unrealized_pl"] < -(equity * MAX_PORTFOLIO_DRAWDOWN_PCT):
+            logger.warning(
+                f"[risk] SELL rejected — risk limits  "
+                f"(unrealized P&L ${position['unrealized_pl']:+,.2f} "
+                f"exceeds drawdown limit)"
+            )
+            # Still sell — this is a protective exit, not a block.
+            # Log the warning but allow the sell to proceed.
+
+        logger.info(
+            f"           Selling {position['qty']}x {active_symbol}  "
+            f"(entry=${position['avg_entry_price']:.2f}  "
+            f"P&L=${position['unrealized_pl']:+,.2f})"
+        )
         sell(active_symbol)
         logger.info(SEP + "\n")
         return
@@ -584,3 +633,4 @@ def run():
 
 if __name__ == "__main__":
     run()
+

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Probability Estimator — directional signal quality gate.
 =========================================================
 Drop-in replacement for the original Brownian-motion estimator.
@@ -53,7 +53,7 @@ from models.logistic_probability import get_or_train_model, reset_model
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
-def estimate_crossover_probability(df) -> dict:
+def estimate_crossover_probability(df, log_selection: bool = True) -> dict:
     """
     Estimate directional probability using logistic regression.
 
@@ -68,6 +68,8 @@ def estimate_crossover_probability(df) -> dict:
         OHLCV + indicators DataFrame.  Required columns:  close
         Optional (used as features if present):
             short_ma, long_ma, rsi, volume, high, low
+    log_selection : bool
+        When True, log which model was selected (CV vs fixed).
 
     Returns
     -------
@@ -87,7 +89,13 @@ def estimate_crossover_probability(df) -> dict:
     buy_thresh  = PROB_BUY_THRESHOLD  / 100.0
     sell_thresh = PROB_SELL_THRESHOLD / 100.0
 
-    model   = get_or_train_model(df, PROB_TRAIN_BARS, buy_thresh, sell_thresh)
+    model   = get_or_train_model(
+        df,
+        PROB_TRAIN_BARS,
+        buy_thresh,
+        sell_thresh,
+        log_selection=log_selection,
+    )
     up_prob = model.predict(df)       # P(next bar closes UP)
     dn_prob = 1.0 - up_prob
 

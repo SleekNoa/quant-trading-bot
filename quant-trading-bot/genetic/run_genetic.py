@@ -110,7 +110,7 @@ def train(
     df = get_historical_data(symbol)
     if df is None or len(df) < 100:
         raise RuntimeError(f"Insufficient data for {symbol} (got {len(df) if df is not None else 0} bars)")
-    print(f"        {len(df)} bars loaded  ({df.index[0].date()} → {df.index[-1].date()})")
+    print(f"        {len(df)} bars loaded  ({df.index[0].date()} -> {df.index[-1].date()})")
 
     # ── 2. Compute indicators ─────────────────────────────────────────────────
     print("  [2/4] Computing indicators...")

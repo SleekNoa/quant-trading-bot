@@ -102,12 +102,21 @@ class Node:
     def __repr__(self) -> str:
         if self.ntype in ("AND", "OR"):
             return f"({self.children[0]} {self.ntype} {self.children[1]})"
-        if self.ntype == "GT":
-            return f"({self.children[0].value} > {self.children[1].value:.3f})"
-        if self.ntype == "LT":
-            return f"({self.children[0].value} < {self.children[1].value:.3f})"
+
+        if self.ntype in ("GT", "LT"):
+            left = self.children[0].value
+            right = self.children[1].value
+            op = ">" if self.ntype == "GT" else "<"
+
+            # format only numeric values
+            def fmt(val):
+                return f"{val:.3f}" if isinstance(val, (float, int)) else str(val)
+
+            return f"({fmt(left)} {op} {fmt(right)})"
+
         if self.ntype == "ERC":
-            return f"{self.value:.3f}"
+            return f"{self.value:.3f}" if isinstance(self.value, (float, int)) else str(self.value)
+
         return str(self.value)  # TERMINAL
 
 

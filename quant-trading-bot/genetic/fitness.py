@@ -197,6 +197,38 @@ def evaluate_individual(
     return compute_objectives(trades)
 
 
+# ── Full individual evaluator + trade count ───────────────────────────────────
+
+def evaluate_individual_with_trades(
+    tree:        Node,
+    close_prices: np.ndarray,
+    term_matrix:  np.ndarray,          # (n_bars, n_terminals) — from build_terminal_matrix
+    sell_days:    int   = DEFAULT_SELL_DAYS,
+    sell_pct:     float = DEFAULT_SELL_PCT,
+    sl_pct:       float = DEFAULT_SL_PCT,
+) -> Tuple[Tuple[float, float, float], int]:
+    """
+    Full pipeline with trade count: tree evaluation → trade simulation → objectives.
+
+    Returns
+    -------
+    (objectives, trade_count)
+    """
+    n = len(close_prices)
+    if n < max(sell_days + 5, 30):
+        return NO_TRADE_PENALTY, 0
+
+    buy_signals = np.zeros(n, dtype=bool)
+    for i in range(n):
+        row_dict = row_to_dict(term_matrix, i)
+        try:
+            buy_signals[i] = tree.evaluate(row_dict)
+        except Exception:
+            buy_signals[i] = False
+
+    trades = simulate_trades(close_prices, buy_signals, sell_days, sell_pct, sl_pct)
+    return compute_objectives(trades), len(trades)
+
 # ── Batch evaluator for multiprocessing ──────────────────────────────────────
 
 def evaluate_population_batch(

@@ -47,6 +47,8 @@ from typing import List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from utils.logger import logger
+
 from genetic.gp_tree import (
     Node,
     ramped_half_and_half,
@@ -55,7 +57,7 @@ from genetic.gp_tree import (
 )
 from genetic.terminals import TERMINAL_NAMES, build_terminal_matrix
 from genetic.fitness import (
-    evaluate_individual,
+    evaluate_individual_with_trades,
     DEFAULT_SELL_DAYS,
     DEFAULT_SELL_PCT,
     DEFAULT_SL_PCT,
@@ -90,6 +92,7 @@ class MOO3Individual:
     sell_pct:   float = DEFAULT_SELL_PCT
     sl_pct:     float = DEFAULT_SL_PCT
     objectives: Tuple[float, float, float] = field(default=NO_TRADE_PENALTY)
+    trade_count: int = 0
 
     # ── Signal generation ──────────────────────────────────────────────────────
 
@@ -129,7 +132,8 @@ class MOO3Individual:
         tr, wr, dd = self.objectives
         return (
             f"MOO3Individual(TR={tr:+.3f}, WR={wr:.1%}, MaxDD={dd:.1%}, "
-            f"sell_days={self.sell_days}, sell_pct={self.sell_pct:.1%})"
+            f"sell_days={self.sell_days}, sell_pct={self.sell_pct:.1%}, "
+            f"trades={self.trade_count})"
         )
 
 
@@ -190,7 +194,7 @@ class MOO3Engine:
                 tree=tree,
                 sell_days=random.randint(5, 30),
                 sell_pct=random.uniform(0.02, 0.15),
-                sl_pct=random.uniform(0.02, 0.10),
+                sl_pct=random.uniform(0.02, 0.40),
             )
             self.population.append(ind)
 
@@ -202,11 +206,12 @@ class MOO3Engine:
         Returns (n, 3) array of (TR, WR, MaxDD).
         """
         objectives = np.zeros((len(individuals), 3), dtype=np.float64)
+        trade_counts = np.zeros(len(individuals), dtype=np.int64)
 
         if self.n_workers > 1:
             # Parallel evaluation via ProcessPoolExecutor
             # Note: trees must be picklable (they are pure Python objects)
-            from genetic.fitness import evaluate_individual as _eval
+            from genetic.fitness import evaluate_individual_with_trades as _eval
             futures = {}
             with ProcessPoolExecutor(max_workers=self.n_workers) as executor:
                 for i, ind in enumerate(individuals):
@@ -223,14 +228,17 @@ class MOO3Engine:
                 for fut in as_completed(futures):
                     i = futures[fut]
                     try:
-                        objectives[i] = fut.result()
+                        obj, tcount = fut.result()
+                        objectives[i] = obj
+                        trade_counts[i] = tcount
                     except Exception:
                         objectives[i] = NO_TRADE_PENALTY
+                        trade_counts[i] = 0
         else:
             # Single-threaded (default — avoids process spawn overhead for small P)
             for i, ind in enumerate(individuals):
                 try:
-                    objectives[i] = evaluate_individual(
+                    obj, tcount = evaluate_individual_with_trades(
                         ind.tree,
                         self.close_prices,
                         self.term_matrix,
@@ -238,12 +246,16 @@ class MOO3Engine:
                         ind.sell_pct,
                         ind.sl_pct,
                     )
+                    objectives[i] = obj
+                    trade_counts[i] = tcount
                 except Exception:
                     objectives[i] = NO_TRADE_PENALTY
+                    trade_counts[i] = 0
 
         # Update individual's cached objectives
         for i, ind in enumerate(individuals):
             ind.objectives = tuple(objectives[i])
+            ind.trade_count = int(trade_counts[i])
 
         return objectives
 
@@ -381,16 +393,29 @@ class MOO3Engine:
 
         pareto_objectives = self.objectives[pareto_indices]
         pareto_population = [self.population[i] for i in pareto_indices]
+        pareto_trade_counts = np.array([ind.trade_count for ind in pareto_population], dtype=np.int64)
 
         # ── Step 5: Select best via mSR ───────────────────────────────────────
-        best_idx    = select_from_pareto(pareto_objectives, self.msr_weights)
+        best_idx    = select_from_pareto(
+            pareto_objectives,
+            self.msr_weights,
+            trade_counts=pareto_trade_counts,
+            min_trades=25,
+        )
         best        = pareto_population[best_idx]
         self.best_individual = best
 
         if self.verbose:
             print(SEP)
             print(f"  PARETO FRONT  ({len(pareto_indices)} solutions)")
-            print(describe_pareto_front(pareto_objectives, self.msr_weights))
+            print(
+                describe_pareto_front(
+                    pareto_objectives,
+                    self.msr_weights,
+                    trade_counts=pareto_trade_counts,
+                    min_trades=25,
+                )
+            )
             print()
             print(f"  SELECTED STRATEGY: {best}")
             print(SEP)
@@ -441,6 +466,23 @@ class MOO3Engine:
             ind = pickle.load(f)
         return ind
 
+    # ── Sanitize MOO3params ─────────────────────────────
+    @staticmethod
+    def sanitize_moo3_params(ind: "MOO3Individual") -> "MOO3Individual":
+        if ind.sl_pct <= 0:
+            logger.warning(f"[MOO3] Invalid SL {ind.sl_pct:+.4f} -> set to 0.02")
+            ind.sl_pct = 0.02
+        if ind.sl_pct > 0.40:
+            logger.warning(f"[MOO3] SL too large {ind.sl_pct:+.4f} -> clamped to 0.40")
+            ind.sl_pct = 0.40
+        if ind.sell_pct <= 0:
+            logger.warning(f"[MOO3] Invalid TP {ind.sell_pct:+.4f} -> set to 0.06")
+            ind.sell_pct = 0.06
+        if ind.sell_days < 3 or ind.sell_days > 60:
+            logger.warning(f"[MOO3] Invalid days {ind.sell_days} -> set to 15")
+            ind.sell_days = 15
+        return ind
+
 
 # ── Convenience loader (for main.py integration) ─────────────────────────────
 
@@ -454,6 +496,7 @@ def load_and_register_moo3(df: pd.DataFrame, weight: float = 2.0) -> bool:
         return False
     try:
         best = MOO3Engine.load()
+        best = MOO3Engine.sanitize_moo3_params(best)
         from strategies.strategy_engine import register_strategy
 
         @register_strategy("MOO3", weight=weight)

@@ -34,7 +34,7 @@ Usage
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -61,6 +61,10 @@ def select_from_pareto(
     pareto_objectives: np.ndarray,      # (front_size, 3): TR, WR, MaxDD
     weights: Tuple[float, float, float] = (DEFAULT_W_TR, DEFAULT_W_WR, DEFAULT_W_DD),
     eps: float = 1e-6,
+    dd_floor: float = 0.02,
+    min_tr: float = 2.0,
+    trade_counts: Optional[np.ndarray] = None,
+    min_trades: int = 25,
 ) -> int:
     """
     Select the best individual from a Pareto front using the mSR criterion.
@@ -82,9 +86,21 @@ def select_from_pareto(
 
     w_tr, w_wr, w_dd = weights
 
-    n_tr  = _minmax_normalise(pareto_objectives[:, 0])   # TR  → higher = better
-    n_wr  = _minmax_normalise(pareto_objectives[:, 1])   # WR  → higher = better
-    n_dd  = _minmax_normalise(pareto_objectives[:, 2])   # DD  → lower  = better
+    if trade_counts is not None and len(trade_counts) != len(pareto_objectives):
+        trade_counts = None
+
+    eligible = np.where(pareto_objectives[:, 0] >= min_tr)[0]
+    if trade_counts is not None and min_trades > 0:
+        eligible = eligible[trade_counts[eligible] >= min_trades]
+    if eligible.size == 0:
+        eligible = np.where(pareto_objectives[:, 0] >= min_tr)[0]
+    if eligible.size == 0:
+        eligible = np.arange(len(pareto_objectives))
+
+    n_tr  = _minmax_normalise(pareto_objectives[eligible, 0])   # TR  → higher = better
+    n_wr  = _minmax_normalise(pareto_objectives[eligible, 1])   # WR  → higher = better
+    n_dd  = _minmax_normalise(pareto_objectives[eligible, 2])   # DD  → lower  = better
+    n_dd = np.maximum(n_dd, dd_floor)
     n_dd_inv = 1.0 - n_dd                                # invert so higher = better
 
     # Numerator: weighted quality score (maximise)
@@ -94,13 +110,17 @@ def select_from_pareto(
     denominator = w_dd * n_dd + eps
 
     msr_scores = numerator / denominator
-    best_idx   = int(np.argmax(msr_scores))
-    return best_idx
+    best_local = int(np.argmax(msr_scores))
+    return int(eligible[best_local])
 
 
 def describe_pareto_front(
     pareto_objectives: np.ndarray,
     weights: Tuple[float, float, float] = (DEFAULT_W_TR, DEFAULT_W_WR, DEFAULT_W_DD),
+    dd_floor: float = 0.02,
+    min_tr: float = 2.0,
+    trade_counts: Optional[np.ndarray] = None,
+    min_trades: int = 25,
 ) -> str:
     """
     Return a formatted summary table of the Pareto front + selected individual.
@@ -108,26 +128,53 @@ def describe_pareto_front(
     if len(pareto_objectives) == 0:
         return "  [Pareto front is empty]\n"
 
-    best_idx = select_from_pareto(pareto_objectives, weights)
-    lines    = [
-        f"  {'#':<4}  {'TR':>8}  {'WinRate':>8}  {'MaxDD':>8}  {'mSR':>8}",
-        "  " + "-" * 50,
+    if trade_counts is not None and len(trade_counts) != len(pareto_objectives):
+        trade_counts = None
+
+    best_idx = select_from_pareto(
+        pareto_objectives,
+        weights,
+        dd_floor=dd_floor,
+        min_tr=min_tr,
+        trade_counts=trade_counts,
+        min_trades=min_trades,
+    )
+    header = f"  {'#':<4}  {'TR':>8}  {'WinRate':>8}  {'MaxDD':>8}"
+    if trade_counts is not None:
+        header += f"  {'Trades':>6}"
+    header += f"  {'mSR':>8}"
+    lines = [
+        header,
+        "  " + "-" * 60,
     ]
 
     # Compute mSR for display
     w_tr, w_wr, w_dd = weights
-    n_tr  = _minmax_normalise(pareto_objectives[:, 0])
-    n_wr  = _minmax_normalise(pareto_objectives[:, 1])
-    n_dd  = _minmax_normalise(pareto_objectives[:, 2])
+    eligible = np.where(pareto_objectives[:, 0] >= min_tr)[0]
+    if trade_counts is not None and min_trades > 0:
+        eligible = eligible[trade_counts[eligible] >= min_trades]
+    if eligible.size == 0:
+        eligible = np.where(pareto_objectives[:, 0] >= min_tr)[0]
+    if eligible.size == 0:
+        eligible = np.arange(len(pareto_objectives))
+
+    n_tr  = _minmax_normalise(pareto_objectives[eligible, 0])
+    n_wr  = _minmax_normalise(pareto_objectives[eligible, 1])
+    n_dd  = _minmax_normalise(pareto_objectives[eligible, 2])
+    n_dd = np.maximum(n_dd, dd_floor)
     denom = w_dd * n_dd + 1e-6
     msr   = (w_tr * n_tr + w_wr * n_wr) / denom
+    msr_all = np.full(len(pareto_objectives), np.nan, dtype=float)
+    msr_all[eligible] = msr
 
-    for i, (obj, m) in enumerate(zip(pareto_objectives, msr)):
+    for i, (obj, m) in enumerate(zip(pareto_objectives, msr_all)):
         marker = " ★" if i == best_idx else ""
-        lines.append(
-            f"  {i:<4}  {obj[0]:>+7.3f}  {obj[1]:>7.1%}  {obj[2]:>7.1%}  {m:>8.3f}{marker}"
-        )
+        row = f"  {i:<4}  {obj[0]:>+7.3f}  {obj[1]:>7.1%}  {obj[2]:>7.1%}"
+        if trade_counts is not None:
+            row += f"  {int(trade_counts[i]):>6}"
+        row += f"  {m:>8.3f}{marker}"
+        lines.append(row)
 
-    lines.append("  " + "-" * 50)
+    lines.append("  " + "-" * 60)
     lines.append(f"  Selected: #{best_idx}  (★ = best mSR)")
     return "\n".join(lines)

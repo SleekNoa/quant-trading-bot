@@ -26,7 +26,8 @@ Sections
 import os
 from dotenv import load_dotenv
 import pandas as pd
-from utils import load_tickers
+from utils import load_tickers, load_ticker
+
 
 
 
@@ -48,7 +49,11 @@ ALPACA_SECRET_KEY    = os.getenv("ALPACA_SECRET_KEY")
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Primary symbol for the single-ticker pipeline (reads from .env if set)
-SYMBOL = os.getenv("SYMBOL", "AAPL")
+#Single ticker mode
+SYMBOL = load_ticker()
+# Multi-ticker mode
+TICKERS = load_tickers()
+
 
 # Multi-ticker universe — used when USE_MULTI_TICKER = True
 # The bot scans all tickers, ranks signals, then executes on the best one
@@ -59,7 +64,7 @@ SYMBOL = os.getenv("SYMBOL", "AAPL")
 
 #]
 
-TICKERS = load_tickers()
+# TICKERS = load_tickers()
 
 # holding {DO NOT REMOVE} - LIN, XOM
 # GREAT TEST {DO NOT REMOVE} - ["LIF", "DOW", "LYB", "CE", "OLN", "ACHR", "APD", "DD", "HUN",
@@ -77,7 +82,7 @@ ASK_SAME_DAY_CONFIRM = True # Set to False to disable the [Y/N] prompt entirely
 
 # Change STRATEGY to switch the active strategy without touching main.py
 # Options: "sma" | "rsi" | "macd" | "bollinger" | "stochastic"
-STRATEGY = "macd"
+STRATEGY = ""
 
 # SMA parameters
 SHORT_WINDOW = 20
@@ -174,8 +179,8 @@ VAR_METHOD = "auto"
 USE_PROB_MODEL = True
 
 # Number of bars used to train the logistic model (from the tail of df)
-# Minimum ~50 required; 200 gives a reliable fit without overfitting
-PROB_TRAIN_BARS = 400
+# Minimum ~50 required; 800 gives a more stable fit
+PROB_TRAIN_BARS = 800
 
 # Probability thresholds (as percentages: 55 = 55% = 0.55 fraction)
 # A BUY crossover only fires if P(up) ≥ PROB_BUY_THRESHOLD
@@ -229,7 +234,7 @@ MC_HORIZON_DAYS = 30           # e.g. 1 trading month stress horizon
 MC_ACCEPTABLE_VAR_PCT = 0.10    # 10% — block trades if worse than this
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 11. Multi-Ticker Engine                                            ← NEW
+# 11. Multi-Ticker Engine
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Enable multi-ticker scanning mode
@@ -255,7 +260,7 @@ MULTI_TICKER_TOP_N = 3
 # ══════════════════════════════════════════════════════════════════
 
 # Enable loading a pre-trained MOO3 model at main.py startup
-# HOW TO RUN python genetic/run_genetic.py --pop 20 --gens 15 (MORE GENS = SLOWER)
+# HOW TO RUN python genetic/run_genetic.py --pop 20 --gens 50 (MORE GENS = SLOWER)
 # Set to True after running: python genetic/run_genetic.py
 USE_MOO3_PLUGIN = True  # flip to True after first training run
 
@@ -290,7 +295,7 @@ DAILY_LOSS_LIMIT_PCT = 0.05         # 5%
 
 # Per-trade stop-loss: close position if price drops more than X% from entry
 USE_STOP_LOSS = True
-STOP_LOSS_PCT = 0.05                # 5%
+# STOP_LOSS_PCT = 0.05                # 5%
 
 # Per-trade take-profit: close position if price rises more than X% from entry
 USE_TAKE_PROFIT = True
@@ -306,3 +311,35 @@ MIN_SIGNAL_PROBABILITY = 60     # 50% for test 55% = same as PROB_BUY_THRESHOLD
 
 # Run Monte Carlo stress test before each live BUY (live gate, risk_manager.py)
 RUN_STRESS_TEST = True
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 15. Dedicated Exit Layer                                           ← NEW
+#     Reference: Long, Kampouridis & Papastylianou (2026), Section 4.
+#     "Sell either after n days have passed from purchase, or when a
+#      price increase of r% has occurred, whichever comes first."
+#     Mirrors the exit logic in genetic/fitness.py for the live pipeline.
+#     execution/exit_monitor.py runs these rules BEFORE the engine decision.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Risk control (protect downside — highest priority in live & backtest)
+USE_STOP_LOSS      = True
+STOP_LOSS_PCT      = -0.05          # -5% from entry — checked every day
+
+# Rule 1 — Take-profit exit
+# Already defined above as USE_TAKE_PROFIT / TAKE_PROFIT_PCT (Section 12).
+# exit_monitor.py reads those same values — no duplication needed.
+
+# Rule 2 — Trailing stop (tracks peak price since entry, not fixed from entry)
+# Distinct from STOP_LOSS_PCT which is a fixed bracket from entry price.
+# Trailing stop lets winners run further before cutting them.
+USE_TRAILING_STOP  = True
+TRAILING_STOP_PCT  = 0.08  # 6% drop from peak triggers exit
+                             # e.g. stock runs to +15% then drops 6% → sell at ~+9%
+
+# Rule 3 — Time-based exit (max holding period in calendar days)
+# Prevents positions from becoming "forgotten" holds.
+# Matches DEFAULT_SELL_DAYS = 15 used in genetic/fitness.py.
+USE_TIME_EXIT      = True
+EXIT_MAX_HOLD_DAYS = 60   # sell after 15 calendar days regardless of P&L
+                          # most big winners were 27–68 days
+                          # 60 days captures ~90% of upside while cutting very long losers
