@@ -295,7 +295,7 @@ DAILY_LOSS_LIMIT_PCT = 0.05         # 5%
 
 # Per-trade stop-loss: close position if price drops more than X% from entry
 USE_STOP_LOSS = True
-# STOP_LOSS_PCT = 0.05                # 5%
+STOP_LOSS_PCT = 0.05                # 5%
 
 # Per-trade take-profit: close position if price rises more than X% from entry
 USE_TAKE_PROFIT = True
@@ -322,8 +322,8 @@ RUN_STRESS_TEST = True
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── Risk control (protect downside — highest priority in live & backtest)
-USE_STOP_LOSS      = True
-STOP_LOSS_PCT      = -0.05          # -5% from entry — checked every day
+# USE_STOP_LOSS / STOP_LOSS_PCT already defined in Section 12
+# STOP_LOSS_PCT = 0.05  # 5% from entry — triggers when P&L <= -5%
 
 # Rule 1 — Take-profit exit
 # Already defined above as USE_TAKE_PROFIT / TAKE_PROFIT_PCT (Section 12).

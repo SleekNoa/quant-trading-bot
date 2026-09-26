@@ -24,7 +24,7 @@ from utils.logger import logger
 _STALENESS_DAYS = 90
 
 
-# ── Single-ticker safe fetch ───────────────────────────────────────────────────
+# --- Single-ticker safe fetch -------------------------------------------------
 
 def fetch_ticker_safe(
     ticker:   str,
@@ -42,17 +42,17 @@ def fetch_ticker_safe(
         if df is None or len(df) < min_bars:
             bar_count = len(df) if df is not None else 0
             logger.warning(
-                f"           {ticker}: skipped — only {bar_count} bars "
-                f"(need ≥ {min_bars})"
+                f"           {ticker}: skipped - only {bar_count} bars "
+                f"(need >= {min_bars})"
             )
             return None
 
-        # Reject simulated/stale data — last bar must be within 90 days
+        # Reject simulated/stale data - last bar must be within 90 days
         last_date = pd.Timestamp(df.index[-1]).to_pydatetime().replace(tzinfo=None)
         cutoff    = datetime.now() - timedelta(days=_STALENESS_DAYS)
         if last_date < cutoff:
             logger.warning(
-                f"           {ticker}: skipped — last bar {last_date.date()} "
+                f"           {ticker}: skipped - last bar {last_date.date()} "
                 f"is stale (simulated fallback or delisted)"
             )
             return None
@@ -60,11 +60,11 @@ def fetch_ticker_safe(
         return df
 
     except Exception as exc:
-        logger.error(f"           {ticker}: fetch failed — {exc}")
+        logger.error(f"           {ticker}: fetch failed - {exc}")
         return None
 
 
-# ── Multi-ticker batch fetch ───────────────────────────────────────────────────
+# --- Multi-ticker batch fetch -------------------------------------------------
 
 def fetch_all_tickers(
     tickers:   list[str],
@@ -83,7 +83,7 @@ def fetch_all_tickers(
 
     Returns
     -------
-    dict { ticker: DataFrame } — successfully loaded tickers only
+    dict { ticker: DataFrame } - successfully loaded tickers only
     """
     result: dict[str, pd.DataFrame] = {}
     total  = len(tickers)
@@ -91,7 +91,7 @@ def fetch_all_tickers(
 
     logger.info(
         f"           Multi-ticker scan: {total} ticker(s) "
-        f"— delay {delay_sec}s between calls"
+        f"- delay {delay_sec}s between calls"
     )
 
     for i, ticker in enumerate(tickers):
@@ -103,7 +103,7 @@ def fetch_all_tickers(
             result[ticker] = df
             start_dt = df.index[0].strftime("%Y-%m-%d")
             end_dt   = df.index[-1].strftime("%Y-%m-%d")
-            logger.info(f"           {ticker}: {len(df)} bars  ({start_dt} → {end_dt})")
+            logger.info(f"           {ticker}: {len(df)} bars  ({start_dt} -> {end_dt})")
         else:
             n_fail += 1
 

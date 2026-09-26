@@ -167,7 +167,7 @@ def check_drawdown_circuit_breaker(account_equity: float,
     drawdown = (account_equity - peak_equity) / peak_equity
     if drawdown <= -MAX_PORTFOLIO_DRAWDOWN_PCT:
         logger.warning(
-            f"[risk] ⛔ CIRCUIT BREAKER — portfolio drawdown "
+            f"[risk] CIRCUIT BREAKER - portfolio drawdown "
             f"{drawdown*100:.1f}% exceeds limit "
             f"-{MAX_PORTFOLIO_DRAWDOWN_PCT*100:.0f}%. Trading HALTED."
         )
@@ -190,7 +190,7 @@ def check_daily_loss_limit(daily_pnl: float, account_equity: float) -> bool:
     daily_pnl_pct = daily_pnl / account_equity
     if daily_pnl_pct <= -DAILY_LOSS_LIMIT_PCT:
         logger.warning(
-            f"[risk] ⛔ DAILY LOSS LIMIT — P&L {daily_pnl_pct*100:.2f}% "
+            f"[risk] DAILY LOSS LIMIT - P&L {daily_pnl_pct*100:.2f}% "
             f"exceeds -{DAILY_LOSS_LIMIT_PCT*100:.0f}%. No more trades today."
         )
         return True
@@ -217,15 +217,15 @@ def passes_signal_gate(buy_pct: float, sell_pct: float,
         return True   # gate disabled
 
     if crossover == 1 and buy_pct >= MIN_SIGNAL_PROBABILITY:
-        logger.info(f"[risk] ✅ Signal gate passed — buy probability {buy_pct:.1f}%")
+        logger.info(f"[risk] Signal gate passed - buy probability {buy_pct:.1f}%")
         return True
     elif crossover == -1 and sell_pct >= MIN_SIGNAL_PROBABILITY:
-        logger.info(f"[risk] ✅ Signal gate passed — sell probability {sell_pct:.1f}%")
+        logger.info(f"[risk] Signal gate passed - sell probability {sell_pct:.1f}%")
         return True
     else:
         relevant_pct = buy_pct if crossover == 1 else sell_pct
         logger.warning(
-            f"[risk] ❌ Signal gate REJECTED — probability {relevant_pct:.1f}% "
+            f"[risk] Signal gate REJECTED - probability {relevant_pct:.1f}% "
             f"< minimum {MIN_SIGNAL_PROBABILITY:.0f}%"
         )
         return False
@@ -274,19 +274,19 @@ def monte_carlo_stress_test(df: pd.DataFrame, price: float,
     position_value = shares * price
     passed = var_pct < MC_ACCEPTABLE_VAR_PCT
 
-    status = "✅ PASSED" if passed else "❌ BLOCKED"
+    status = "PASSED" if passed else "BLOCKED"
     explanation = (
         f"MC stress test ({MC_SIMULATIONS} paths, {MC_HORIZON_DAYS}d horizon): "
         f"VaR={var_pct*100:.1f}%  worst={worst_pct*100:.1f}%  "
         f"median={median_pct*100:.1f}%  "
-        f"position=${position_value:,.0f}  →  {status}"
+        f"position=${position_value:,.0f}  ->  {status}"
     )
     logger.info(f"[risk] {explanation}")
 
     if not passed:
         logger.warning(
-            f"[risk] ⛔ MC VaR {var_pct*100:.1f}% > limit "
-            f"{MC_ACCEPTABLE_VAR_PCT*100:.0f}% — trade BLOCKED by stress test"
+            f"[risk] MC VaR {var_pct*100:.1f}% > limit "
+            f"{MC_ACCEPTABLE_VAR_PCT*100:.0f}% - trade BLOCKED by stress test"
         )
 
     return {

@@ -5,8 +5,8 @@ Main evolutionary loop implementing Long et al. (2026) MOO3.
 
 Architecture
 ------------
-  MOO3Individual  — one candidate strategy (tree + sell params + objectives)
-  MOO3Engine      — orchestrates: initialise → evolve → select → register
+  MOO3Individual  - one candidate strategy (tree + sell params + objectives)
+  MOO3Engine      - orchestrates: initialise -> evolve -> select -> register
 
 Algorithm (paper Section 4, Algorithm 1 + NSGA-II flowchart Fig. 3)
 ---------------------------------------------------------------------
@@ -18,7 +18,7 @@ Algorithm (paper Section 4, Algorithm 1 + NSGA-II flowchart Fig. 3)
        c. Apply subtree crossover (prob p_cx) and point mutation (prob p_mut)
        d. Evaluate offspring fitness
        e. Combine parents + offspring (2P individuals)
-       f. Select next generation of P via NSGA-II élite strategy
+       f. Select next generation of P via NSGA-II elite strategy
   4. Extract Pareto front (rank-1 individuals)
   5. Select best individual using modified Sharpe Ratio
   6. Register best as "MOO3" plugin in strategy_engine
@@ -68,13 +68,13 @@ from genetic.sharpe_selector import select_from_pareto, describe_pareto_front
 from genetic.nsga2 import fast_non_dominated_sort
 
 
-# ── Model persistence path ────────────────────────────────────────────────────
+# --- Model persistence path ---------------------------------------------------
 
 _MODEL_DIR  = os.path.join(os.path.dirname(__file__), "..", "models")
 _MODEL_PATH = os.path.join(_MODEL_DIR, "moo3_best.pkl")
 
 
-# ── Individual ────────────────────────────────────────────────────────────────
+# --- Individual ---------------------------------------------------------------
 
 @dataclass
 class MOO3Individual:
@@ -85,7 +85,7 @@ class MOO3Individual:
     sell_days  : max holding period in bars (evolved alongside tree)
     sell_pct   : take-profit threshold (evolved alongside tree)
     sl_pct     : stop-loss threshold
-    objectives : (TR, WR, MaxDD) — set after fitness evaluation
+    objectives : (TR, WR, MaxDD) - set after fitness evaluation
     """
     tree:       Node
     sell_days:  int   = DEFAULT_SELL_DAYS
@@ -94,7 +94,7 @@ class MOO3Individual:
     objectives: Tuple[float, float, float] = field(default=NO_TRADE_PENALTY)
     trade_count: int = 0
 
-    # ── Signal generation ──────────────────────────────────────────────────────
+    # --- Signal generation -----------------------------------------------------
 
     def predict(self, df: pd.DataFrame) -> str:
         """
@@ -116,7 +116,7 @@ class MOO3Individual:
             pass
         return "HOLD"
 
-    # ── Sell parameters ────────────────────────────────────────────────────────
+    # --- Sell parameters -------------------------------------------------------
 
     def mutate_sell_params(self) -> None:
         """Randomly perturb sell_days and sell_pct (treat as additional genome)."""
@@ -137,7 +137,7 @@ class MOO3Individual:
         )
 
 
-# ── MOO3 Engine ───────────────────────────────────────────────────────────────
+# --- MOO3 Engine --------------------------------------------------------------
 
 class MOO3Engine:
     """
@@ -184,7 +184,7 @@ class MOO3Engine:
         self.gen_history: List[dict] = []
         self.best_individual: Optional[MOO3Individual] = None
 
-    # ── Initialisation ─────────────────────────────────────────────────────────
+    # --- Initialisation ---------------------------------------------------------
 
     def _init_population(self) -> None:
         trees = ramped_half_and_half(TERMINAL_NAMES, self.pop_size, self.max_depth)
@@ -198,7 +198,7 @@ class MOO3Engine:
             )
             self.population.append(ind)
 
-    # ── Fitness evaluation ─────────────────────────────────────────────────────
+    # --- Fitness evaluation -----------------------------------------------------
 
     def _evaluate_all(self, individuals: List[MOO3Individual]) -> np.ndarray:
         """
@@ -235,7 +235,7 @@ class MOO3Engine:
                         objectives[i] = NO_TRADE_PENALTY
                         trade_counts[i] = 0
         else:
-            # Single-threaded (default — avoids process spawn overhead for small P)
+            # Single-threaded (default - avoids process spawn overhead for small P)
             for i, ind in enumerate(individuals):
                 try:
                     obj, tcount = evaluate_individual_with_trades(
@@ -259,7 +259,7 @@ class MOO3Engine:
 
         return objectives
 
-    # ── Offspring generation ───────────────────────────────────────────────────
+    # --- Offspring generation ---------------------------------------------------
 
     def _make_offspring(
         self,
@@ -307,7 +307,7 @@ class MOO3Engine:
 
         return offspring[:self.pop_size]
 
-    # ── Stats logging ──────────────────────────────────────────────────────────
+    # --- Stats logging ----------------------------------------------------------
 
     def _log_gen(self, gen: int, objectives: np.ndarray, elapsed: float) -> None:
         if not self.verbose:
@@ -330,7 +330,7 @@ class MOO3Engine:
             "wr_mean": wr_mean, "dd_mean": dd_mean,
         })
 
-    # ── Main evolutionary loop ─────────────────────────────────────────────────
+    # --- Main evolutionary loop -------------------------------------------------
 
     def run(self) -> MOO3Individual:
         """
@@ -338,7 +338,7 @@ class MOO3Engine:
 
         Returns
         -------
-        best : MOO3Individual — strategy selected from final Pareto front
+        best : MOO3Individual - strategy selected from final Pareto front
                using the modified Sharpe Ratio criterion
         """
         SEP = "=" * 70
@@ -348,21 +348,21 @@ class MOO3Engine:
             print("  MOO3 Genetic Programming Engine")
             print("  Long, Kampouridis & Papastylianou (2026)")
             print(f"  Population={self.pop_size}  Generations={self.n_gens}")
-            print(f"  Objectives: Total Return (×0.40)  |  Win Rate (×0.30)  "
-                  f"|  MaxDD (×0.30)")
+            print(f"  Objectives: Total Return (x0.40)  |  Win Rate (x0.30)  "
+                  f"|  MaxDD (x0.30)")
             print(f"  Terminals: {len(TERMINAL_NAMES)} ({len([t for t in TERMINAL_NAMES if t.startswith('dc_')])} DC + TA)")
             print(SEP)
 
-        # ── Step 1: Initialise ────────────────────────────────────────────────
+        # --- Step 1: Initialise -------------------------------------------------
         self._init_population()
 
-        # ── Step 2: Initial fitness evaluation ───────────────────────────────
+        # --- Step 2: Initial fitness evaluation ---------------------------------
         t_start = time.perf_counter()
         self.objectives = self._evaluate_all(self.population)
         if self.verbose:
             print(f"  Initial population evaluated in {time.perf_counter()-t_start:.1f}s")
 
-        # ── Step 3: Evolutionary loop ─────────────────────────────────────────
+        # --- Step 3: Evolutionary loop -------------------------------------------
         for gen in range(1, self.n_gens + 1):
             t0 = time.perf_counter()
 
@@ -379,7 +379,7 @@ class MOO3Engine:
             combined_pop = self.population + offspring
             combined_obj = np.vstack([self.objectives, offspring_obj])
 
-            # NSGA-II élite selection
+            # NSGA-II elite selection
             selected_idx = select_next_generation(combined_obj, self.pop_size)
 
             self.population = [combined_pop[i] for i in selected_idx]
@@ -387,7 +387,7 @@ class MOO3Engine:
 
             self._log_gen(gen, self.objectives, time.perf_counter() - t0)
 
-        # ── Step 4: Extract Pareto front ──────────────────────────────────────
+        # --- Step 4: Extract Pareto front ----------------------------------------
         fronts = fast_non_dominated_sort(self.objectives)
         pareto_indices = fronts[0]
 
@@ -395,7 +395,7 @@ class MOO3Engine:
         pareto_population = [self.population[i] for i in pareto_indices]
         pareto_trade_counts = np.array([ind.trade_count for ind in pareto_population], dtype=np.int64)
 
-        # ── Step 5: Select best via mSR ───────────────────────────────────────
+        # --- Step 5: Select best via mSR -----------------------------------------
         best_idx    = select_from_pareto(
             pareto_objectives,
             self.msr_weights,
@@ -422,7 +422,7 @@ class MOO3Engine:
 
         return best
 
-    # ── Plugin registration ────────────────────────────────────────────────────
+    # --- Plugin registration ----------------------------------------------------
 
     def register_as_plugin(self, weight: float = 2.0) -> None:
         """
@@ -433,7 +433,7 @@ class MOO3Engine:
         position management logic in main.py.
         """
         if self.best_individual is None:
-            raise RuntimeError("No best individual — run MOO3Engine.run() first.")
+            raise RuntimeError("No best individual - run MOO3Engine.run() first.")
 
         best = self.best_individual
 
@@ -447,17 +447,17 @@ class MOO3Engine:
         if self.verbose:
             print("  [MOO3] Plugin registered in strategy engine  (weight=%.1f)" % weight)
 
-    # ── Persistence ───────────────────────────────────────────────────────────
+    # --- Persistence -----------------------------------------------------------
 
     def save(self, path: str = _MODEL_PATH) -> None:
         """Pickle the best individual to disk."""
         if self.best_individual is None:
-            raise RuntimeError("No model to save — run first.")
+            raise RuntimeError("No model to save - run first.")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as f:
             pickle.dump(self.best_individual, f)
         if self.verbose:
-            print(f"  [MOO3] Model saved → {path}")
+            print(f"  [MOO3] Model saved -> {path}")
 
     @staticmethod
     def load(path: str = _MODEL_PATH) -> MOO3Individual:
@@ -466,7 +466,7 @@ class MOO3Engine:
             ind = pickle.load(f)
         return ind
 
-    # ── Sanitize MOO3params ─────────────────────────────
+    # --- Sanitize MOO3params ----------------------------------------------------
     @staticmethod
     def sanitize_moo3_params(ind: "MOO3Individual") -> "MOO3Individual":
         if ind.sl_pct <= 0:
@@ -484,13 +484,13 @@ class MOO3Engine:
         return ind
 
 
-# ── Convenience loader (for main.py integration) ─────────────────────────────
+# --- Convenience loader (for main.py integration) ------------------------------
 
 def load_and_register_moo3(df: pd.DataFrame, weight: float = 2.0) -> bool:
-    # ── Guard: skip if already registered ────────────────────────────
+    # --- Guard: skip if already registered --------------------------
     from strategies.strategy_engine import list_strategies
     if "MOO3" in list_strategies():
-        return True   # already loaded on a previous ticker — skip silently
+        return True   # already loaded on a previous ticker - skip silently
 
     if not os.path.exists(_MODEL_PATH):
         return False
@@ -503,8 +503,6 @@ def load_and_register_moo3(df: pd.DataFrame, weight: float = 2.0) -> bool:
         def moo3_plugin(df_: pd.DataFrame) -> str:
             return best.predict(df_)
 
-        print(f"  [MOO3] Loaded from {_MODEL_PATH} — registered as plugin")
-        return True
+        print(f"  [MOO3] Loaded from {_MODEL_PATH} - registered as plugin")
     except Exception as e:
         print(f"  [MOO3] Failed to load model: {e}")
-        return False

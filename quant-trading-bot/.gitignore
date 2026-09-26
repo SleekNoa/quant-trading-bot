@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Data files
+logs/
+*.csv
+*.pkl
+*.log
+
+# IDE
+.idea/
+.vscode/

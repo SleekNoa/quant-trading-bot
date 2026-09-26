@@ -1,4 +1,4 @@
-﻿"""
+"""
 QuantBot — Self-Evolving Multi-Strategy Paper Trading Bot
 ==========================================================
 Run:
@@ -240,7 +240,7 @@ def run_backtest_monte_carlo(result):
         if len(returns) < 3:
             logger.info(
                 f"           Monte Carlo skipped: "
-                f"need ≥ 3 closed trades, got {len(returns)}"
+                f"need >= 3 closed trades, got {len(returns)}"
             )
             return
 
@@ -333,8 +333,7 @@ def run_multi_ticker_scan() -> str:
                 decision, report = evaluate_strategies(_df, regime=regime)
 
                 # Quick backtest for Sharpe
-                _signals = strategy_func(_df)
-                bt       = backtest(_signals, symbol=ticker, log_trades=False, log_info=False)
+                bt = backtest(_df, symbol=ticker, log_trades=False, log_info=False)
 
                 # Probability estimate (reset model per ticker)
                 reset_probability_model()

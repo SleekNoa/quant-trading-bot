@@ -108,7 +108,7 @@ def log_engine_report(report):
                 f"(score:{report['weighted_score']:+.2f}  regime:{report['regime']})")
     logger.info(SEP)
     logger.info(f"  {'Strategy':<22} {'Signal':<8} {'Wt':>4}  {'xReg':>5}  {'Contrib':>8}  {'ms':>5}")
-    logger.info(f"  {'─'*22} {'─'*8} {'─'*4}  {'─'*5}  {'─'*8}  {'─'*5}")
+    logger.info(f"  {'-'*22} {'-'*8} {'-'*4}  {'-'*5}  {'-'*8}  {'-'*5}")
     for name, s in report["strategies"].items():
         if s["signal"] == "DISABLED":
             continue

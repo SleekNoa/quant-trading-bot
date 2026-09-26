@@ -230,7 +230,7 @@ def check_exit_rules(
 
     # 1. Hard Stop-Loss
     if USE_STOP_LOSS:
-        sl_threshold = STOP_LOSS_PCT * 100
+        sl_threshold = -STOP_LOSS_PCT * 100  # stop loss triggers at negative P&L
         if pnl_pct <= sl_threshold:
             exit_reason = f"stop_loss ({pnl_pct:.2f}%)"
             logger.info(f"[exit] ✅ {exit_reason}")

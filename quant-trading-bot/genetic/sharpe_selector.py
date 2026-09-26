@@ -168,7 +168,7 @@ def describe_pareto_front(
     msr_all[eligible] = msr
 
     for i, (obj, m) in enumerate(zip(pareto_objectives, msr_all)):
-        marker = " ★" if i == best_idx else ""
+        marker = " *" if i == best_idx else ""
         row = f"  {i:<4}  {obj[0]:>+7.3f}  {obj[1]:>7.1%}  {obj[2]:>7.1%}"
         if trade_counts is not None:
             row += f"  {int(trade_counts[i]):>6}"
@@ -176,5 +176,5 @@ def describe_pareto_front(
         lines.append(row)
 
     lines.append("  " + "-" * 60)
-    lines.append(f"  Selected: #{best_idx}  (★ = best mSR)")
+    lines.append(f"  Selected: #{best_idx}  (* = best mSR)")
     return "\n".join(lines)

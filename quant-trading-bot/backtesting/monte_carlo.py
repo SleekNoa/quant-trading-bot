@@ -9,9 +9,9 @@ Why permutation Monte Carlo?
     different ordering of the same trades could produce wildly different
     drawdowns.  Shuffling removes sequence-of-returns risk from the
     analysis and shows:
-        • the realistic range of equity endpoints
-        • how likely the strategy is to be profitable (P(profit))
-        • how bad the drawdown could realistically get
+        * the realistic range of equity endpoints
+        * how likely the strategy is to be profitable (P(profit))
+        * how bad the drawdown could realistically get
 
 References
 ----------
@@ -47,7 +47,7 @@ SEP  = "=" * 70
 SEP2 = "-" * 70
 
 
-# ── Primary simulation ─────────────────────────────────────────────────────────
+# --- Primary simulation ---------------------------------------------------------
 
 def monte_carlo_test(
     trade_returns:   list[float],
@@ -57,25 +57,25 @@ def monte_carlo_test(
 ) -> dict:
     """
     Fixed permutation Monte Carlo.
-    Now tracks full equity paths → meaningful variation in minimum equity.
+    Now tracks full equity paths -> meaningful variation in minimum equity.
     """
     if not trade_returns or len(trade_returns) < 3:
         return {
-            "error": f"Need ≥ 3 closed trades; got {len(trade_returns) if trade_returns else 0}"
+            "error": f"Need >= 3 closed trades; got {len(trade_returns) if trade_returns else 0}"
         }
 
     rng = np.random.default_rng(seed)
     arr = np.asarray(trade_returns, dtype=float)
     n_trades = len(arr)
 
-    # ── Generate all shuffled paths at once ────────────────────────────────────
+    # --- Generate all shuffled paths at once -------------------------------------
     shuffled = np.stack([rng.permutation(arr) for _ in range(simulations)])
 
-    # ── Build full equity paths (cumulative product) ───────────────────────────
+    # --- Build full equity paths (cumulative product) ------------------------------
     multipliers = 1.0 + shuffled / 100.0
     equity_paths = initial_capital * np.cumprod(multipliers, axis=1)
 
-    # ── Extract statistics per path ────────────────────────────────────────────
+    # --- Extract statistics per path ---------------------------------------------
     finals = equity_paths[:, -1]          # final equity
     mins   = np.min(equity_paths, axis=1) # lowest equity during path
 
@@ -89,7 +89,7 @@ def monte_carlo_test(
     def _idx(p: float) -> int:
         return int(np.clip(n * p, 0, n - 1))
 
-    # ── Trade-level analytics (order-independent) ──────────────────────────────
+    # --- Trade-level analytics (order-independent) -------------------------------
     wins   = arr[arr > 0]
     losses = arr[arr < 0]
     win_rate = len(wins) / n_trades if n_trades else 0.0
@@ -136,7 +136,7 @@ def monte_carlo_test(
     }
 
 
-# ── Max drawdown distribution ──────────────────────────────────────────────────
+# --- Max drawdown distribution ---------------------------------------------------
 
 def monte_carlo_max_drawdown(
     trade_returns:   list[float],
@@ -149,7 +149,7 @@ def monte_carlo_max_drawdown(
     Returns distribution of worst drawdown seen in each path.
     """
     if not trade_returns or len(trade_returns) < 3:
-        return {"error": "Need ≥ 3 trades for drawdown simulation"}
+        return {"error": "Need >= 3 trades for drawdown simulation"}
 
     rng = np.random.default_rng(seed)
     arr = np.asarray(trade_returns, dtype=float)
@@ -180,7 +180,7 @@ def monte_carlo_max_drawdown(
 
 
 
-# ── Helper: extract trade returns from backtester output ─────────────────────
+# --- Helper: extract trade returns from backtester output ------------------------
 
 def extract_trade_returns(trades: list[dict]) -> list[float]:
     """
@@ -195,7 +195,7 @@ def extract_trade_returns(trades: list[dict]) -> list[float]:
 
     Returns
     -------
-    list of floats — one entry per completed round-trip trade
+    list of floats - one entry per completed round-trip trade
     """
     returns:    list[float] = []
     buy_price:  Optional[float] = None
@@ -212,7 +212,7 @@ def extract_trade_returns(trades: list[dict]) -> list[float]:
     return returns
 
 
-# ── Formatted console report ───────────────────────────────────────────────────
+# --- Formatted console report ----------------------------------------------------
 
 def print_monte_carlo_report(mc: dict, dd: Optional[dict] = None) -> None:
     """
@@ -220,7 +220,7 @@ def print_monte_carlo_report(mc: dict, dd: Optional[dict] = None) -> None:
     """
     logger.info(SEP)
     logger.info("  MONTE CARLO ROBUSTNESS TEST")
-    logger.info(f"  {mc.get('simulations', 0):,} shuffled paths × {mc.get('n_trades', 0)} trades")
+    logger.info(f"  {mc.get('simulations', 0):,} shuffled paths x {mc.get('n_trades', 0)} trades")
     logger.info("  Ref: Ahmed (2023) arXiv:2309.09094 | Wang et al. (2026)")
     logger.info(SEP)
 
@@ -236,7 +236,7 @@ def print_monte_carlo_report(mc: dict, dd: Optional[dict] = None) -> None:
 
     # Final equity (order-independent)
     logger.info(f"  {'Final Equity (all paths)':<34} ${mc['median_final']:>12,.2f}")
-    logger.info(f"  {'  (order-invariant — same for all shuffles)':<34}")
+    logger.info(f"  {'  (order-invariant - same for all shuffles)':<34}")
     logger.info(SEP2)
 
     # Path-dependent risk (the real insight)
@@ -249,7 +249,7 @@ def print_monte_carlo_report(mc: dict, dd: Optional[dict] = None) -> None:
     logger.info("  Probability Summary")
     logger.info(f"  {'P(profitable outcome)':<34} {mc['prob_profit_pct']:>12.1f}%")
     logger.info(f"  {'P(loss)':<34} {mc['prob_loss_pct']:>12.1f}%")
-    logger.info(f"  {'P(ruin ≤ $0)':<34} {mc['prob_ruin_pct']:>12.1f}%")
+    logger.info(f"  {'P(ruin <= $0)':<34} {mc['prob_ruin_pct']:>12.1f}%")
     logger.info(SEP2)
 
     logger.info("  Trade Analytics")

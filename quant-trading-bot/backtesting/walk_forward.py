@@ -295,10 +295,10 @@ def print_walk_forward_report(results: list[dict], summary: dict) -> None:
 
     # ── Overall grade ─────────────────────────────────────────────────────────
     grade = _wf_grade(s)
-    logger.info(f"  Walk-Forward Grade:  {grade}")
+    logger.info("  Walk-Forward Grade:  " + grade)
     logger.info(
-        f"  (note: modest OOS returns are honest — "
-        f"overfitted systems show high in-sample, near-zero OOS)"
+        "  (note: modest OOS returns are honest - "
+        "overfitted systems show high in-sample, near-zero OOS)"
     )
     logger.info(SEP)
 
@@ -335,8 +335,8 @@ def _wf_grade(s: dict) -> str:
     mean_sh = s.get("mean_sharpe", 0)
 
     if fold_wr >= 60 and mean_sh > 0.5:
-        return "PASS  [robust — strategy holds up out-of-sample]"
+        return "PASS  [robust - strategy holds up out-of-sample]"
     elif fold_wr >= 40:
-        return "MARGINAL  [inconsistent — tune parameters or add filters]"
+        return "MARGINAL  [inconsistent - tune parameters or add filters]"
     else:
-        return "FAIL  [not robust — likely overfitted to historical data]"
+        return "FAIL  [not robust - likely overfitted to historical data]"
