@@ -187,23 +187,6 @@ def _run_single_backtest(df_with_signals: pd.DataFrame, log_trades: bool = True)
         "trades": trades,  # now includes exit_reason, days_held - useful for analysis
     }
 
-def sanitize_moo3_params(best):
-        if best.sl_pct <= 0:
-            logger.warning(f"[MOO3] Invalid SL {best.sl_pct:+.4f} -> set to 0.02")
-            best.sl_pct = 0.02
-        if best.sl_pct > 0.40:
-            logger.warning(f"[MOO3] SL too large {best.sl_pct:+.4f} -> clamped to 0.40")
-            best.sl_pct = 0.40
-
-        if best.sell_pct < 0:
-            logger.warning(f"[MOO3] Invalid TP {best.sell_pct:+.4f} -> clamped")
-            best.sell_pct = 0.01
-
-        if best.sell_days < 1:
-            best.sell_days = 1
-
-        return best
-
 
 # --- ADD this function ABOVE backtest_all_strategies() ---
 # --- UPDATED _run_moo3_backtest (replace the entire function) ---
@@ -237,7 +220,7 @@ def _run_moo3_backtest(
             USE_TRAILING_STOP, TRAILING_STOP_PCT,
         )
         best = MOO3Engine.load()
-        best = sanitize_moo3_params(best)
+        best = MOO3Engine.sanitize_moo3_params(best)
 
         # LOGGER FOR BOT STATS
         if log_info:

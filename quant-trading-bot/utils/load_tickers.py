@@ -1,7 +1,22 @@
 # utils/load_tickers.py
 import pandas as pd
+import os
 
-def load_ticker(path="TICKER.csv"):
+def _get_project_root():
+    """Get the project root directory (parent of utils folder)."""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def _find_csv(filename):
+    """Find CSV file in project root or fallback to current directory."""
+    project_root = _get_project_root()
+    candidate = os.path.join(project_root, filename)
+    if os.path.exists(candidate):
+        return candidate
+    return filename  # fallback to current directory
+
+def load_ticker(path=None):
+    if path is None:
+        path = _find_csv("TICKER.csv")
     df = pd.read_csv(path, header=None)
     tickers = df.values.flatten()
     tickers = pd.Series(tickers).dropna().astype(str)
@@ -10,7 +25,9 @@ def load_ticker(path="TICKER.csv"):
 
 
 
-def load_tickers(path="TICKERS.csv"):
+def load_tickers(path=None):
+    if path is None:
+        path = _find_csv("TICKERS.csv")
     df = pd.read_csv(path, header=None)
     tickers = df.values.flatten()
     tickers = pd.Series(tickers).dropna().astype(str)

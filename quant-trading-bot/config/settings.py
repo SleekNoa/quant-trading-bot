@@ -1,4 +1,4 @@
-"""
+﻿"""
 QuantBot — Central Configuration
 ==================================
 All tunable parameters live here.  main.py imports from this file only;
@@ -34,8 +34,8 @@ from utils import load_tickers, load_ticker
 
 
 
-load_dotenv()
-
+_env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+load_dotenv(_env_path)
 # ══════════════════════════════════════════════════════════════════════════════
 # 1.  API Credentials
 # ══════════════════════════════════════════════════════════════════════════════
@@ -343,3 +343,11 @@ USE_TIME_EXIT      = True
 EXIT_MAX_HOLD_DAYS = 60   # sell after 15 calendar days regardless of P&L
                           # most big winners were 27–68 days
                           # 60 days captures ~90% of upside while cutting very long losers
+
+
+
+
+
+
+
+

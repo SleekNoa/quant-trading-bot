@@ -133,3 +133,69 @@ def detect_market_regime(df, adx_threshold=25.0):
         return "unknown"
     regime = "trending" if latest_adx >= adx_threshold else "ranging"
     return regime
+
+
+def log_contribution_analysis(report):
+    """
+    Log a detailed contribution analysis showing how much each strategy
+    contributes to the final decision, with special attention to MOO3.
+    
+    This helps identify whether the ensemble is truly diversified or
+    dominated by a single component.
+    """
+    strategies = report.get("strategies", {})
+    total_score = report.get("weighted_score", 0)
+    
+    if not strategies or total_score == 0:
+        return
+    
+    SEP = "-" * 70
+    
+    # Calculate positive contributions
+    positive = {k: v for k, v in strategies.items() if v.get("contribution", 0) > 0}
+    
+    if not positive:
+        return
+    
+    total_positive = sum(v.get("contribution", 0) for v in positive.values())
+    
+    # Check if MOO3 is present and calculate its contribution
+    moo3_contrib = strategies.get("MOO3", {}).get("contribution", 0)
+    
+    logger.info(SEP)
+    logger.info("  CONTRIBUTION ANALYSIS")
+    logger.info(SEP)
+    
+    # Show each strategy's contribution
+    logger.info(f"  {'Strategy':<22} {'Weight':>7}  {'Contribution':>11}  {'% of Score':>10}")
+    logger.info(f"  {'-'*22} {'-'*7}  {'-'*11}  {'-'*10}")
+    
+    for name, s in strategies.items():
+        contrib = s.get("contribution", 0)
+        if contrib > 0:
+            pct = (contrib / total_positive * 100) if total_positive > 0 else 0
+            logger.info(
+                f"  {name:<22} {s['eff_weight']:>7.2f}  {contrib:>+11.3f}  {pct:>9.1f}%"
+            )
+    
+    logger.info(SEP)
+    
+    # MOO3-specific analysis
+    if moo3_contrib > 0:
+        moo3_pct = (moo3_contrib / total_positive * 100) if total_positive > 0 else 0
+        logger.info(f"  MOO3 contribution: {moo3_pct:.1f}% of total positive score")
+        if moo3_pct > 40:
+            logger.info("  [WARN] MOO3 dominates the ensemble decision - consider reducing weight")
+        else:
+            logger.info("  MOO3 provides meaningful but not dominant contribution")
+    
+    # Ensemble diversity check
+    n_buy = report.get("buy_votes", 0)
+    n_total = n_buy + report.get("sell_votes", 0) + report.get("hold_votes", 0)
+    
+    if n_buy > 0:
+        logger.info(f"  Consensus: {n_buy} strategy(ies) voting BUY")
+        if n_buy == 1 and moo3_contrib > 0:
+            logger.info("  [WARN] Only MOO3 voting BUY - weak consensus")
+    
+    logger.info(SEP)

@@ -17,6 +17,8 @@ from utils.logger import logger
 
 # === NEW: yfinance (this is the only thing you actually need) ===
 import yfinance as yf
+import certifi
+import ssl
 
 
 # ... (keep all existing imports)
@@ -29,7 +31,7 @@ def get_historical_data(symbol: str = None) -> pd.DataFrame:
     - USE_SIMULATED_DATA = True → forces 500-bar synthetic data (ignores symbol)
     """
     if USE_SIMULATED_DATA:
-        logger.info("[market_data] USE_SIMULATED_DATA=True → using synthetic 500-bar data")
+        logger.info("[market_data] USE_SIMULATED_DATA=True -> using synthetic 500-bar data")
         return _simulate()   # simulation doesn't use symbol anyway
 
     # Determine which symbol to fetch

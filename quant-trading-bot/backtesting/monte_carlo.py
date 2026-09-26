@@ -271,4 +271,9 @@ def print_monte_carlo_report(mc: dict, dd: Optional[dict] = None) -> None:
 
     grade = "PASS  [robust]" if mc.get("passed", False) else "FAIL  [review strategy edge]"
     logger.info(f"  MC Grade: {grade}")
+    logger.info(
+        "  Note: MC PASS indicates trade sequence robustness, NOT that the strategy "
+        "outperforms buy-and-hold. A strategy can be robust yet underperform passive "
+        "investing if it captures only a portion of the market's gains."
+    )
     logger.info(SEP)

@@ -10,10 +10,29 @@ Fixes vs original:
     6. get_today_activity reads filled orders — not position qty
     7. sell() uses OrderSide.SELL (was incorrectly OrderSide.BUY)
     8. sell() no longer references undefined stop_loss_price / price
+    9. Uses custom CA bundle with corporate proxy certificates for SSL verification
 """
 
 import os
+import ssl
+import certifi
 from utils.logger import logger
+
+# ── Configure SSL to use custom CA bundle with corporate certificates ────────────
+# This must be set before any HTTPS connections are made
+# The custom_cacert.pem includes all Raytheon/RTX corporate certificates
+_custom_ca_path = os.path.join(os.path.dirname(certifi.__file__), 'custom_cacert.pem')
+if os.path.exists(_custom_ca_path):
+    os.environ.setdefault('SSL_CERT_FILE', _custom_ca_path)
+    os.environ.setdefault('REQUESTS_CA_BUNDLE', _custom_ca_path)
+    os.environ.setdefault('CURL_CA_BUNDLE', _custom_ca_path)
+    logger.info(f"[broker] Using custom CA bundle: {_custom_ca_path}")
+else:
+    # Fallback to certifi default
+    os.environ.setdefault('SSL_CERT_FILE', certifi.where())
+    os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
+    os.environ.setdefault('CURL_CA_BUNDLE', certifi.where())
+    logger.warning(f"[broker] Custom CA bundle not found, using certifi default")
 from config.settings import (
     ALPACA_API_KEY, ALPACA_SECRET_KEY,
     USE_STOP_LOSS, STOP_LOSS_PCT,
@@ -42,12 +61,29 @@ except ImportError:
 PAPER_BASE_URL = "https://paper-api.alpaca.markets"
 
 
+def _get_ssl_context():
+    """Create SSL context with custom CA bundle (includes corporate certificates)."""
+    custom_ca = os.path.join(os.path.dirname(certifi.__file__), 'custom_cacert.pem')
+    cafile = custom_ca if os.path.exists(custom_ca) else certifi.where()
+    ctx = ssl.create_default_context(cafile=cafile)
+    return ctx
+
+
 def _get_client():
     if ALPACA_PY_AVAILABLE is True:
-        return TradingClient(ALPACA_API_KEY, ALPACA_SECRET_KEY, paper=True)
+        # alpaca-py uses requests internally, which respects SSL_CERT_FILE env var
+        # The custom CA bundle is set at module import time above
+        return TradingClient(
+            ALPACA_API_KEY, ALPACA_SECRET_KEY,
+            paper=True,
+        )
     elif ALPACA_PY_AVAILABLE is False:
-        return tradeapi.REST(ALPACA_API_KEY, ALPACA_SECRET_KEY,
-                             PAPER_BASE_URL, api_version="v2")
+        return tradeapi.REST(
+            ALPACA_API_KEY, ALPACA_SECRET_KEY,
+            PAPER_BASE_URL,
+            api_version="v2",
+            tls_context=_get_ssl_context()
+        )
     return None
 
 
@@ -132,7 +168,7 @@ def buy(symbol: str, qty: int, stop_loss_price: float = None) -> dict | None:
 
         stop_note = (f" | stop-loss @ ${stop_loss_price:.2f}"
                      if (USE_STOP_LOSS and stop_loss_price) else "")
-        logger.info(f"[broker] ✅ BUY  {qty}x {symbol}  submitted{stop_note}  · id: {order_id}")
+        logger.info(f"[broker] BUY  {qty}x {symbol}  submitted{stop_note}  · id: {order_id}")
         return {"order_id": str(order_id), "qty": qty, "symbol": symbol, "side": "buy"}
 
     except Exception as e:
@@ -178,7 +214,7 @@ def sell(symbol: str, qty: int = None) -> dict | None:
             )
             order_id = order.id
 
-        logger.info(f"[broker] ✅ SELL {qty}x {symbol}  submitted  · id: {order_id}")
+        logger.info(f"[broker] SELL {qty}x {symbol}  submitted  · id: {order_id}")
         return {"order_id": str(order_id), "qty": qty, "symbol": symbol, "side": "sell"}
 
     except Exception as e:

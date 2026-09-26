@@ -503,6 +503,8 @@ def load_and_register_moo3(df: pd.DataFrame, weight: float = 2.0) -> bool:
         def moo3_plugin(df_: pd.DataFrame) -> str:
             return best.predict(df_)
 
-        print(f"  [MOO3] Loaded from {_MODEL_PATH} - registered as plugin")
+        logger.info(f"  [MOO3] Loaded from {_MODEL_PATH} - registered as plugin")
+        return True
     except Exception as e:
-        print(f"  [MOO3] Failed to load model: {e}")
+        logger.warning(f"  [MOO3] Failed to load model: {e}")
+        return False

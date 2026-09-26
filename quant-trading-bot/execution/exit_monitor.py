@@ -233,7 +233,7 @@ def check_exit_rules(
         sl_threshold = -STOP_LOSS_PCT * 100  # stop loss triggers at negative P&L
         if pnl_pct <= sl_threshold:
             exit_reason = f"stop_loss ({pnl_pct:.2f}%)"
-            logger.info(f"[exit] ✅ {exit_reason}")
+            logger.info(f"[exit] {exit_reason}")
             return exit_reason
         logger.info(f"[exit] Stop-loss: {pnl_pct:+.2f}% (trigger at {sl_threshold:.2f}%)")
 
@@ -241,7 +241,7 @@ def check_exit_rules(
     if USE_TIME_EXIT:
         if days_held >= EXIT_MAX_HOLD_DAYS:
             exit_reason = f"time_exit ({days_held} days held)"
-            logger.info(f"[exit] ✅ {exit_reason}")
+            logger.info(f"[exit] {exit_reason}")
             return exit_reason
         days_rem = EXIT_MAX_HOLD_DAYS - days_held
         logger.info(f"[exit] Time exit: {days_held}/{EXIT_MAX_HOLD_DAYS} days ({days_rem} remaining)")
@@ -254,7 +254,7 @@ def check_exit_rules(
             trail_thresh = -TRAILING_STOP_PCT * 100
             if dd_from_peak <= trail_thresh:
                 exit_reason = f"trailing_stop ({dd_from_peak:.2f}% from peak ${peak:.2f})"
-                logger.info(f"[exit] ✅ {exit_reason}")
+                logger.info(f"[exit] {exit_reason}")
                 return exit_reason
             logger.info(
                 f"[exit] Trailing stop: {dd_from_peak:+.2f}% from peak "
@@ -268,7 +268,7 @@ def check_exit_rules(
         tp_threshold = TAKE_PROFIT_PCT * 100
         if pnl_pct >= tp_threshold:
             exit_reason = f"take_profit ({pnl_pct:.2f}%)"
-            logger.info(f"[exit] ✅ {exit_reason}")
+            logger.info(f"[exit] {exit_reason}")
             return exit_reason
         logger.info(f"[exit] Take-profit: {pnl_pct:+.2f}% (need +{tp_threshold:.1f}%)")
 
@@ -330,16 +330,16 @@ def run_exit_monitor(
 
     if exit_reason:
         logger.warning(
-            f"[exit] 🔔 EXIT TRIGGERED for {qty}x {symbol}  —  {exit_reason}"
+            f"[exit] EXIT TRIGGERED for {qty}x {symbol}  —  {exit_reason}"
         )
         result = broker_sell(symbol)
         if result:
             logger.info(
-                f"[exit] ✅ Sell order submitted  "
+                f"[exit] Sell order submitted  "
                 f"(qty={qty}  price≈${current_price:.2f})"
             )
         else:
-            logger.error("[exit] ❌ Sell order failed — check broker logs")
+            logger.error("[exit] Sell order failed — check broker logs")
         return True
 
     logger.info(f"[exit] No exit rules triggered for {symbol} — holding")

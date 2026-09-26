@@ -164,6 +164,7 @@ def summarize_walk_forward(results: list[dict]) -> dict:
     # Exclude 0-trade folds from return/Sharpe/win-rate aggregation
     # They represent periods with no signal, not strategy failures
     traded = [r for r in valid if r.get("n_trades", 0) > 0]
+    zero_trade = [r for r in valid if r.get("n_trades", 0) == 0]
 
     if not valid:
         return {
@@ -182,13 +183,15 @@ def summarize_walk_forward(results: list[dict]) -> dict:
     trade_cnts = [r.get("n_trades",       0) for r in valid]  # all folds for total count
 
     profitable    = sum(1 for r in returns if r > 0)
-    fold_win_rate = profitable / len(agg) * 100 if agg else 0.0
+    profitable_traded = sum(1 for r in traded if r.get("return_pct", 0) > 0)
+    fold_win_rate = profitable_traded / len(traded) * 100 if traded else 0.0
 
     return {
         "folds":              len(results),
         "valid_folds":        len(valid),
         "traded_folds":       len(traded),
-        "profitable_folds":   profitable,
+        "zero_trade_folds":   len(zero_trade),
+        "profitable_folds":   profitable_traded,
         "fold_win_rate_pct":  round(fold_win_rate, 1),
 
         "mean_return_pct":    round(float(np.mean(returns)),   2) if returns else 0.0,
@@ -215,6 +218,10 @@ def print_walk_forward_report(results: list[dict], summary: dict) -> None:
     """
     Print a formatted walk-forward report via the project logger.
     Called from main.py after walk_forward_test() completes.
+    
+    IMPORTANT: Performance metrics (Mean/Median Return, Sharpe, etc.) are
+    calculated ONLY over traded folds (folds with n_trades > 0), while the
+    fold counts show the full picture including zero-trade periods.
     """
     from utils.logger import logger
 
@@ -267,29 +274,41 @@ def print_walk_forward_report(results: list[dict], summary: dict) -> None:
 
     logger.info(SEP2)
 
-    # ── Aggregate summary ─────────────────────────────────────────────────────
+    # ── Walk-Forward Summary ───────────────────────────────────────────────────
     s = summary
 
+    logger.info("  Walk-Forward Summary")
+    logger.info(SEP2)
     logger.info(
-        f"  {'Folds (valid / traded / total)':<32} "
-        f"{s['valid_folds']} / {s.get('traded_folds', s['valid_folds'])} / {s['folds']}"
+        f"  {'Total folds':<32} {s['folds']}"
     )
     logger.info(
-        f"  {'Profitable folds':<32} "
+        f"  {'Valid folds':<32} {s['valid_folds']}"
+    )
+    logger.info(
+        f"  {'Traded folds':<32} {s.get('traded_folds', s['valid_folds'])}"
+    )
+    logger.info(
+        f"  {'Zero-trade folds':<32} {s.get('zero_trade_folds', 0)}"
+    )
+    logger.info(
+        f"  {'Profitable folds (of traded)':<32} "
         f"{s['profitable_folds']}  ({s['fold_win_rate_pct']:.1f}%)"
     )
     logger.info(SEP2)
-    logger.info(f"  {'Mean OOS Return':<32} {s['mean_return_pct']:>+.2f}%")
-    logger.info(f"  {'Median OOS Return':<32} {s['median_return_pct']:>+.2f}%")
-    logger.info(f"  {'Return Std Dev':<32} {s['std_return_pct']:.2f}%")
+    
+    # Performance metrics calculated only on traded folds
+    logger.info(f"  {'Mean OOS Return (traded folds)':<32} {s['mean_return_pct']:>+.2f}%")
+    logger.info(f"  {'Median OOS Return (traded folds)':<32} {s['median_return_pct']:>+.2f}%")
+    logger.info(f"  {'Return Std Dev (traded folds)':<32} {s['std_return_pct']:.2f}%")
     logger.info(
-        f"  {'Best / Worst fold':<32} "
+        f"  {'Best / Worst fold (traded)':<32} "
         f"{s['best_fold_pct']:>+.1f}%  /  {s['worst_fold_pct']:>+.1f}%"
     )
     logger.info(SEP2)
-    logger.info(f"  {'Mean OOS Sharpe':<32} {s['mean_sharpe']:.2f}")
+    logger.info(f"  {'Mean OOS Sharpe (traded folds)':<32} {s['mean_sharpe']:.2f}")
     logger.info(f"  {'Worst Drawdown (any fold)':<32} {s['worst_drawdown_pct']:.2f}%")
-    logger.info(f"  {'Mean Win Rate':<32} {s['mean_win_rate_pct']:.1f}%")
+    logger.info(f"  {'Mean Win Rate (traded folds)':<32} {s['mean_win_rate_pct']:.1f}%")
     logger.info(f"  {'Total OOS Trades':<32} {s['total_trades']}")
     logger.info(SEP2)
 
@@ -333,10 +352,15 @@ def _fmt_date(dt) -> str:
 def _wf_grade(s: dict) -> str:
     fold_wr = s.get("fold_win_rate_pct", 0)
     mean_sh = s.get("mean_sharpe", 0)
+    traded_folds = s.get("traded_folds", s.get("valid_folds", 0))
+    total_folds = s.get("folds", 1)
+    
+    # Penalize if too many folds have zero trades (indicates overly conservative strategy)
+    trade_coverage = traded_folds / total_folds if total_folds > 0 else 0
 
-    if fold_wr >= 60 and mean_sh > 0.5:
+    if fold_wr >= 60 and mean_sh > 0.5 and trade_coverage >= 0.5:
         return "PASS  [robust - strategy holds up out-of-sample]"
-    elif fold_wr >= 40:
+    elif fold_wr >= 40 and trade_coverage >= 0.3:
         return "MARGINAL  [inconsistent - tune parameters or add filters]"
     else:
         return "FAIL  [not robust - likely overfitted to historical data]"

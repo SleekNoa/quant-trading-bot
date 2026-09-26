@@ -52,7 +52,7 @@ import strategies.plugins  # noqa — triggers @register_strategy decorators
 from data.market_data import get_historical_data
 from strategies.strategy_engine import (
     evaluate_strategies, detect_market_regime,
-    log_engine_report, list_strategies,
+    log_engine_report, log_contribution_analysis, list_strategies,
 )
 from strategies.adx_filter          import add_adx
 from strategies.obv_filter          import add_obv
@@ -132,11 +132,15 @@ def print_backtest_header(result, symbol=SYMBOL):
         "  [marginal]" if result["sharpe"] > 0.5 else
         "  [poor]"
     )
-    dd_note = (
-        "  [comfortable]" if result["max_drawdown"] > -10 else
-        "  [moderate]"    if result["max_drawdown"] > -20 else
-        "  [high]"
-    )
+    # Drawdown notes: more explicit thresholds
+    if result["max_drawdown"] > -10:
+        dd_note = "  [comfortable]"
+    elif result["max_drawdown"] > -20:
+        dd_note = "  [moderate]"
+    elif result["max_drawdown"] > -30:
+        dd_note = "  [high]"
+    else:
+        dd_note = "  [very high - review risk]"
 
     logger.info(SEP)
     logger.info(f"  ENGINE BACKTEST  --  {symbol}")
@@ -154,6 +158,19 @@ def print_backtest_header(result, symbol=SYMBOL):
     logger.info(f"  {'Win Rate':<26} {result['win_rate']:>12.1f}%")
     logger.info(f"  {'Total Trades':<26} {result['n_trades']:>13}")
     logger.info(SEP)
+
+    # Explicit warning for concerning metrics
+    if result["max_drawdown"] < -50:
+        logger.warning(
+            f"  [WARN] Historical max drawdown of {result['max_drawdown']:.1f}% "
+            f"suggests significant risk. Consider tighter stops or position scaling."
+        )
+    if result["return_pct"] - result["buy_hold"] < -50:
+        logger.info(
+            f"  Note: Negative alpha ({result['return_pct'] - result['buy_hold']:+.1f}%) "
+            f"vs buy-and-hold is expected for active strategies that don't capture all upside. "
+            f"The strategy may still be valuable if it provides downside protection."
+        )
 
 
 # ── Risk dashboard ─────────────────────────────────────────────────────────────
@@ -180,15 +197,54 @@ def print_risk_dashboard(cash, equity, var, cvar):
 # ── Walk-forward runner ────────────────────────────────────────────────────────
 
 def run_walk_forward(df):
-    """Run walk-forward validation and print the report."""
+    """Run walk-forward validation and print the report.
+    
+    IMPORTANT: This validates the actual strategy engine being used in production,
+    not individual strategies in isolation. The walk-forward strategy function
+    uses the same evaluate_strategies logic as the live engine.
+    """
     try:
         from backtesting.walk_forward import walk_forward_test, print_walk_forward_report
-        from strategies import STRATEGY_FACTORY
+        from strategies import STRATEGY_FACTORY, DEFAULT_STRATEGY
+        from strategies.strategy_engine import evaluate_strategies
 
-        strategy_func = STRATEGY_FACTORY.get(STRATEGY)
-        if strategy_func is None:
-            logger.warning(f"           Walk-forward: unknown strategy '{STRATEGY}', using MACD")
-            strategy_func = STRATEGY_FACTORY.get("macd", list(STRATEGY_FACTORY.values())[0])
+        # ── Create a strategy function that mimics the live engine ─────────────────────
+        # This ensures walk-forward validates what actually runs in production
+        def engine_strategy_func(df_slice):
+            """
+            Strategy function for walk-forward that uses the actual strategy engine.
+            Returns DataFrame with 'crossover' column like individual strategies.
+            """
+            df_result = df_slice.copy()
+            
+            # Detect regime for the slice
+            regime = detect_market_regime(df_result, ADX_THRESHOLD)
+            
+            # Get the ensemble decision (same as live engine)
+            decision, _ = evaluate_strategies(df_result, regime=regime)
+            
+            # Convert decision to crossover format expected by backtester
+            # 1 = bullish crossover, -1 = bearish crossover, 0 = no signal
+            if decision == "BUY":
+                df_result['crossover'] = 1
+            elif decision == "SELL":
+                df_result['crossover'] = -1
+            else:
+                df_result['crossover'] = 0
+            
+            return df_result
+
+        # ── Fallback: Use individual strategy if specified in settings ───────────────
+        if STRATEGY and STRATEGY.strip():
+            strategy_func = STRATEGY_FACTORY.get(STRATEGY)
+            if strategy_func is not None:
+                logger.info(f"           Walk-forward: using individual strategy '{STRATEGY}'")
+            else:
+                logger.warning(f"           Walk-forward: unknown strategy '{STRATEGY}', using engine ensemble")
+                strategy_func = engine_strategy_func
+        else:
+            logger.info("           Walk-forward: using strategy engine ensemble (validates actual live logic)")
+            strategy_func = engine_strategy_func
 
         logger.info(
             f"           Walk-forward params: "
@@ -418,7 +474,9 @@ def run():
 
     # ── One-time MOO3 registration ────────────────────────────────────
     if USE_MOO3_PLUGIN:
-        if not load_and_register_moo3(df, weight=MOO3_PLUGIN_WEIGHT):
+        if load_and_register_moo3(df, weight=MOO3_PLUGIN_WEIGHT):
+            logger.info("  [MOO3] Model loaded and registered successfully")
+        else:
             logger.info("  [MOO3] No saved model — run: python genetic/run_genetic.py")
 
     # ── 3. Regime detection ───────────────────────────────────────────────────
@@ -429,6 +487,7 @@ def run():
     logger.info("[ 4 / 7 ]  Running strategy engine (live signal)...")
     decision, report = evaluate_strategies(df, regime=regime)
     log_engine_report(report)
+    log_contribution_analysis(report)
 
     latest = df.iloc[-1]
     price = float(latest["close"])
@@ -580,7 +639,7 @@ def run():
 
     if bought_today or pending_buy:
         logger.warning(
-            f"[main] ⚠️  Duplicate guard triggered for {active_symbol}: "
+            f"[main] WARNING: Duplicate guard triggered for {active_symbol}: "
             f"open_position={has_position} | bought_qty={activity['bought_qty']} "
             f"| pending_buy={activity['pending_buy_count']} "
             f"| pending_sell={activity['pending_sell_count']}"
@@ -593,7 +652,7 @@ def run():
         while True:
             try:
                 answer = input(
-                    f"\n⚠️  Active position/order exists for {active_symbol}. "
+                    f"\nWARNING: Active position/order exists for {active_symbol}. "
                     f"Execute ANOTHER BUY? [Y/N]: "
                 ).strip().upper()
             except EOFError:
