@@ -1028,13 +1028,13 @@ Based on the logs you've shown:
 
 | Component                | Status      |
 | ------------------------ | ----------- |
-| Indicator engine         | ✅ good      |
-| Strategy voting          | ✅ good      |
-| Risk management          | ✅ very good |
-| Backtesting              | ⚠ basic     |
-| Walk-forward testing     | ❌ missing   |
-| Monte Carlo testing      | ❌ missing   |
-| Position sizing research | ⚠ basic     |
+| Indicator engine         | [OK] good      |
+| Strategy voting          | [OK] good      |
+| Risk management          | [OK] very good |
+| Backtesting              | [!] basic     |
+| Walk-forward testing     | [X] missing   |
+| Monte Carlo testing      | [X] missing   |
+| Position sizing research | [!] basic     |
 
 ---
 
@@ -1054,7 +1054,7 @@ would make it **much closer to professional quant research infrastructure**.
 
 ---
 
-✅ If you'd like, I can also show you something extremely useful next:
+[OK] If you'd like, I can also show you something extremely useful next:
 
 **How to convert your current bot into a “self-improving strategy lab”** where it automatically:
 
@@ -1340,7 +1340,7 @@ because **weak trades get filtered out**.
 
 After logistic regression, the next **quant-fund upgrades** are:
 
-### 1️⃣ Walk-Forward Validation
+### 1. Walk-Forward Validation
 
 Instead of one backtest:
 
@@ -1354,7 +1354,7 @@ Prevents overfitting.
 
 ---
 
-### 2️⃣ Monte Carlo Strategy Stress Tests
+### 2. Monte Carlo Strategy Stress Tests
 
 Randomize trade order to estimate:
 
@@ -1364,7 +1364,7 @@ true drawdown distribution
 
 ---
 
-### 3️⃣ Strategy Ensemble
+### 3. Strategy Ensemble
 
 Instead of one probability model:
 
@@ -1378,7 +1378,7 @@ Then average probabilities.
 
 ---
 
-### 4️⃣ Kelly Position Sizing
+### 4. Kelly Position Sizing
 
 Use probability directly:
 
@@ -1409,7 +1409,7 @@ because **robustness > complexity** in markets.
 
 ---
 
-✅ **What we just built**
+[OK] **What we just built**
 
 You now have the **same statistical probability framework used in early-stage quant funds.**
 
@@ -1701,7 +1701,7 @@ because **weak trades get filtered out**.
 
 After logistic regression, the next **quant-fund upgrades** are:
 
-### 1️⃣ Walk-Forward Validation
+### 1. Walk-Forward Validation
 
 Instead of one backtest:
 
@@ -1715,7 +1715,7 @@ Prevents overfitting.
 
 ---
 
-### 2️⃣ Monte Carlo Strategy Stress Tests
+### 2. Monte Carlo Strategy Stress Tests
 
 Randomize trade order to estimate:
 
@@ -1725,7 +1725,7 @@ true drawdown distribution
 
 ---
 
-### 3️⃣ Strategy Ensemble
+### 3. Strategy Ensemble
 
 Instead of one probability model:
 
@@ -1739,7 +1739,7 @@ Then average probabilities.
 
 ---
 
-### 4️⃣ Kelly Position Sizing
+### 4. Kelly Position Sizing
 
 Use probability directly:
 
@@ -1770,7 +1770,7 @@ because **robustness > complexity** in markets.
 
 ---
 
-✅ **What we just built**
+[OK] **What we just built**
 
 You now have the **same statistical probability framework used in early-stage quant funds.**
 

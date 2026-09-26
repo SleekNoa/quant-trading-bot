@@ -136,7 +136,7 @@ def run():
     # ── 1. Market Data ────────────────────────────────────────────────
     logger.info("[ 1 / 7 ]  Downloading market data...")
     df = get_historical_data()
-    # The yfinance print ("✅ yfinance: 1,2xx fresh bars...") already appears from market_data.py
+    # The yfinance print ("yfinance: 1,2xx fresh bars...") already appears from market_data.py
     logger.info(f"           {len(df)} bars loaded ({df.index[0].date()} -> {df.index[-1].date()})")
 
     # ── 2. Compute all indicator columns ─────────────────────────────
